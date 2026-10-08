@@ -18,7 +18,7 @@ The core learning focus involve understanding:
 
 ## Game link:
 
-https://benclunie.github.io/pollinator-hex/
+https://entomology-hau.github.io/pollinator-hex/
 
 ## Gameplay Mechanics
 
