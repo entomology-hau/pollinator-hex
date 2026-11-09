@@ -52,7 +52,7 @@ export interface GameState {
   species: SpeciesStats | null;
   player: {
     energy: number;
-    pollen: number; // Acts as "Reproductive Resource" (Pollen for bees, Nectar/Biomass for flies)
+    pollen: number; // Collected floral resource units: pollen for bees, nectar for hoverflies; an illustrative score input.
     toxicity: number; // Cumulative toxicity
     q: number;
     r: number;
@@ -68,3 +68,4 @@ export interface EcologicalReport {
   strategyFeedback: string;
   score: number;
 }
+

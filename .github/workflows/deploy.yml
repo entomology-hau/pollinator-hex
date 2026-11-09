@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
 
 permissions:
   contents: write
@@ -12,16 +12,14 @@ jobs:
     concurrency: ci-${{ github.ref }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install and Build
-        run: |
-          npm install
-          npm run build
-        env:
-          API_KEY: ${{ secrets.API_KEY }}
-
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4
         with:

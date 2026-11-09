@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body { margin: 0; font-family: Inter, Arial, sans-serif; }
+  :focus-visible { outline: 3px solid #fcd34d; outline-offset: 4px; }
+  button { touch-action: manipulation; }
+  progress { border: 0; border-radius: 999px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
+}
