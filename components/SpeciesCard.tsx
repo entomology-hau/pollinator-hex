@@ -1,6 +1,7 @@
 import React from 'react';
 import { SpeciesStats, SpeciesType } from '../types';
 import { Battery, Zap, Target, Skull } from 'lucide-react';
+import { REPRESENTATIVE_SPECIES } from '../constants';
 import { BeeIcon } from './BeeIcon';
 import { FlyIcon } from './FlyIcon';
 
@@ -24,7 +25,8 @@ export const SpeciesCard: React.FC<Props> = ({ species, onSelect }) => {
         </div>
       </div>
       
-      <p className="text-slate-400 text-sm mb-6 min-h-16">{species.description}</p>
+      <p className="text-amber-200 text-sm mb-3"><i>{REPRESENTATIVE_SPECIES[species.name]}</i></p>
+      <p className="text-slate-300 text-sm mb-6 min-h-16">{species.description}</p>
       
       <div className="space-y-3 w-full">
         <div className="flex items-center justify-between text-sm">

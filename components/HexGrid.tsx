@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Building2, Flower2, Home, Route, Sprout, Trees, Waves } from 'lucide-react';
+import { Building2, Bug, Flower2, Home, Route, Sprout, Trees, Waves } from 'lucide-react';
 import { GameState, HexCell, SpeciesType, TerrainType } from '../types';
 import { HEX_SIZE, RESOURCE_REGEN_DAYS, TERRAIN_CONFIG } from '../constants';
 import { getMovePreview } from '../game/rules';
@@ -33,7 +33,8 @@ const KEY_DIRECTIONS: Record<string, [number, number]> = {
 
 const keyOf = (q: number, r: number) => `${q},${r}`;
 const formatEnergy = (value: number) => Number(value.toFixed(1)).toString();
-const hasFlowers = (cell: HexCell) => ![TerrainType.NEST, TerrainType.WATER, TerrainType.ROAD].includes(cell.type);
+const hasFlowers = (cell: HexCell) => cell.resourceQuality > 0 && ![TerrainType.NEST, TerrainType.WATER, TerrainType.ROAD].includes(cell.type);
+const terrainLabel = (cell: HexCell) => cell.flowerStrip ? 'Flower strip' : cell.type === TerrainType.MEADOW && cell.resourceQuality === 0 ? 'Unflowering meadow' : TERRAIN_CONFIG[cell.type].label;
 
 export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
   const { map, player, species, day } = gameState;
@@ -66,12 +67,16 @@ export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
   const describeCell = (cell: HexCell) => {
     const here = keyOf(cell.q, cell.r) === playerKey;
     const preview = getMovePreview(gameState, cell.q, cell.r);
-    const terrain = cell.isRevealed ? TERRAIN_CONFIG[cell.type].label : 'Unexplored terrain';
+    const terrain = cell.isRevealed ? terrainLabel(cell) : 'Unexplored terrain';
     const parts = [`Hex ${cell.q}, ${cell.r}`, terrain];
     if (cell.isRevealed && hasFlowers(cell)) {
       const depleted = cell.lastForagedDay !== null && day - cell.lastForagedDay < RESOURCE_REGEN_DAYS;
       parts.push(depleted ? 'Flowers depleted' : 'Flowers available');
+    } else if (cell.isRevealed) {
+      parts.push('No flowers');
     }
+    if (cell.isRevealed && cell.aphids) parts.push('Aphid patch, suitable for hoverfly egg laying');
+    if (cell.isRevealed && cell.flowerStrip) parts.push('Added floral resources');
     if (here) parts.push('Current location');
     else {
       parts.push(`${preview.distance} hexes away`, `Flight costs ${formatEnergy(preview.energyCost)} energy`);
@@ -156,6 +161,7 @@ export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
                 stroke={isFocused ? '#ffffff' : isPreviewed ? '#7dd3fc' : preview.valid ? '#fde68a' : '#475569'}
                 strokeWidth={isFocused ? 4 : isPreviewed ? 3 : preview.valid ? 2 : 1}
               />
+              {cell.isRevealed && cell.flowerStrip && <polygon points={hexPoints} transform="scale(0.85)" fill="none" stroke="#f9a8d4" strokeWidth="2" strokeDasharray="3 2" />}
               {isFocused && <polygon points={hexPoints} fill="none" stroke="#0f172a" strokeWidth="1" transform="scale(0.84)" />}
             </g>
           );
@@ -200,6 +206,10 @@ export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
                   ? <path d="M-4 20 L4 20" stroke="#0f172a" strokeWidth="3" strokeLinecap="round" />
                   : <circle cx="0" cy="20" r="3" fill="white" stroke="#0f172a" strokeWidth="1" />
               )}
+              {cell.isRevealed && cell.aphids && <>
+                <circle cx="17" cy="-17" r="9" fill="#831843" />
+                <Bug x="11" y="-23" width="12" height="12" color="#fce7f3" strokeWidth="2" />
+              </>}
               {!cell.isRevealed && <text textAnchor="middle" dominantBaseline="central" fill={preview.valid ? '#fde68a' : '#94a3b8'} fontSize="17">?</text>}
             </g>;
           })}
@@ -209,9 +219,10 @@ export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
       <div className="min-h-[5rem] rounded-lg border border-slate-700 bg-slate-900 p-3 text-sm" aria-live="polite" aria-atomic="true">
         {selectedCell && selectedPreview && <>
           <p className="font-semibold text-slate-100">
-            {selectedCell.isRevealed ? TERRAIN_CONFIG[selectedCell.type].label : 'Unexplored terrain'}
+            {selectedCell.isRevealed ? terrainLabel(selectedCell) : 'Unexplored terrain'}
             <span className="ml-2 font-normal text-slate-300">({selectedCell.q}, {selectedCell.r})</span>
           </p>
+          {selectedCell.isRevealed && <p className="mt-1 text-xs text-slate-300">{hasFlowers(selectedCell) ? `Flower quality: ${selectedCell.resourceQuality}%.` : 'No floral resources.'}{selectedCell.aphids ? ' Aphids present: hoverfly egg-laying site.' : ''}{selectedCell.pesticideLevel > 0 ? ` Exposure level: ${(selectedCell.pesticideLevel * 100).toFixed(0)}%.` : ' No pesticide exposure.'}</p>}
           {keyOf(selectedCell.q, selectedCell.r) === playerKey ? (
             <p className="mt-1 text-slate-300">Your current location. Inspect another hex to preview a flight.</p>
           ) : <>
@@ -233,7 +244,8 @@ export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
             return <li key={type} className="flex items-center gap-1.5"><Icon aria-hidden="true" className="h-4 w-4" />{TERRAIN_CONFIG[type].label}</li>;
           })}
         </ul>
-        <p className="mt-2">White dot: flowers available. Dash: flowers depleted. Question mark: unexplored.</p>
+        <p className="mt-2 flex items-center gap-1.5"><Bug aria-hidden="true" className="h-4 w-4 text-pink-200" /> Pink insect badge: aphid patch for egg laying.</p>
+        <p className="mt-2">Pink dashed border: flower strip. White dot: flowers available. Dash: flowers depleted. Question mark: unexplored.</p>
       </details>
       <p id="map-keyboard-help" className="mt-3 text-xs leading-relaxed text-slate-300">
         Keyboard: W/S up/down; Q/A upper/lower left; E/D upper/lower right. Arrow keys also explore neighbours.
