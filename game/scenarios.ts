@@ -19,9 +19,9 @@ export const DEFAULT_CONFIG: RunConfig = {
 
 export const SCENARIOS: Record<ScenarioId, ScenarioDescription> = {
   'flower-strips': {
-    id: 'flower-strips', title: 'Flower strips and nest provisioning',
-    question: 'Do extra flowers along a corridor reduce the cost of bringing pollen home?',
-    predictionPrompt: 'Predict how adding flowers will change pollen delivered and distance travelled.',
+    id: 'flower-strips', title: 'Flower strips and foraging',
+    question: 'Do extra flowers along a corridor increase resources gathered and reproductive output?',
+    predictionPrompt: 'Predict how adding flowers will change resources gathered and reproductive output.',
     controlLabel: 'No corridor flowers', interventionLabel: 'Flowering corridor',
     description: 'A fixed meadow corridor leads west from the nest to an outer flower patch. The intervention adds flowers along this corridor; the landscape, roads and exposure remain unchanged.',
     changedFactor: 'Floral supply along five fixed corridor cells; habitat and hazards are held constant.'
@@ -36,8 +36,8 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDescription> = {
   },
   hoverfly: {
     id: 'hoverfly', title: 'Flowers near aphid patches',
-    question: 'Does placing flowers near aphid patches improve hoverfly oviposition opportunities?',
-    predictionPrompt: 'Predict how floral placement will affect travel and egg laying.',
+    question: 'Do flowers near aphid patches increase hoverfly reproductive output?',
+    predictionPrompt: 'Predict how nearby larval food will change the reproductive benefit of floral feeding.',
     controlLabel: 'Flowers farther from aphids', interventionLabel: 'Flowers near aphids',
     description: 'Four equal floral patches are placed either far from or close to two fixed aphid patches. Total floral supply, habitat types, pesticide levels and roads are identical between conditions.',
     changedFactor: 'The position of four floral patches; their total resource quality is conserved.'
@@ -89,7 +89,7 @@ const baselineMap = (seed: string): Map<string, HexCell> => {
       map.set(key, {
         q, r, type, resourceQuality, pesticideLevel,
         isRevealed: distanceFromNest(q, r) <= 1,
-        hasForagedToday: false, lastForagedDay: null, lastOvipositionDay: null,
+        hasForagedToday: false, lastForagedDay: null,
         aphids: type === TerrainType.CROP && randomUnit(seed, 'map', `${key}:aphids`) < 0.35,
         flowerStrip: false
       });

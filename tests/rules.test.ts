@@ -1,17 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { MAX_DAYS, SPECIES_DATA, FLORAL_RESERVE_CAPACITY, OVIPOSITION_RESOURCE_COST, OVIPOSITION_ENERGY_COST, EGGS_PER_OVIPOSITION, MAX_EGGS_PER_DAY } from '../constants';
+import { MAX_DAYS, SPECIES_DATA } from '../constants';
 import { DEFAULT_CONFIG } from '../game/scenarios';
 import { GameState, HexCell, SpeciesType, TerrainType, Weather } from '../types';
 import {
   canForage, createInitialState, createMap, endDay, estimateMoveCost, forage,
   getForageBlockReason, getMovePreview, hexDistance, move, startGame, traceHexPath,
-  getOvipositionBlockReason, getReproductiveScore, isSafeShelter, oviposit
+  getReproductiveScore, hasNearbyAphids, isSafeShelter
 } from '../game/rules';
 
 const tile = (q: number, r: number, type = TerrainType.MEADOW, overrides: Partial<HexCell> = {}): HexCell => ({
   q, r, type, isRevealed: true, hasForagedToday: false,
-  lastForagedDay: null, pesticideLevel: 0, resourceQuality: 80, aphids: false, flowerStrip: false, lastOvipositionDay: null, ...overrides
+  lastForagedDay: null, pesticideLevel: 0, resourceQuality: 80, aphids: false, flowerStrip: false, ...overrides
 });
 const scenario = (cells: HexCell[], species = SpeciesType.BUMBLEBEE): GameState => ({
   ...createInitialState(), status: 'PLAYING', species: SPECIES_DATA[species],
@@ -209,7 +209,6 @@ test('all idle pollinators starve before completing the season, including at she
     assert.equal(move(state, 1, 0, safe), state);
     assert.equal(forage(state), state);
     assert.equal(endDay(state, safe), state);
-    assert.equal(oviposit(state), state);
   }
 });
 
@@ -225,89 +224,115 @@ test('a fed survivor pays final-day maintenance before completing day 15', () =>
   assert.equal(result.player.energy, 20 - state.species!.dailyMaintenance);
 });
 
-test('bees must safely arrive at the nest to convert carried resources into provisioning', () => {
-  let state = scenario([tile(0, 0, TerrainType.NEST), tile(1, 0)]);
-  state = forage(move(state, 1, 0, safe));
-  assert.equal(state.player.carriedPollen, 12);
-  assert.equal(state.player.deliveredPollen, 0);
-  assert.equal(getReproductiveScore(state).score, 0);
-  const delivered = move(state, 0, 0, safe);
-  assert.equal(delivered.player.carriedPollen, 0);
-  assert.equal(delivered.player.deliveredPollen, 12);
-  assert.equal(getReproductiveScore(delivered).score, 0, 'a partial pollen provision does not yet support a whole worker');
-  assert.equal(state.player.carriedPollen, 12, 'delivery does not mutate prior state');
-});
-
-test('pollen carried at an earlier death or exact-energy arrival is never delivered', () => {
-  const state = scenario([tile(0, 0, TerrainType.NEST), tile(1, 0, TerrainType.ROAD), tile(2, 0)]);
-  state.player.q = 2;
-  state.player.carriedPollen = 20;
-  state.player.energy = 40;
-  const collision = move(state, 0, 0, () => 0);
-  assert.equal(collision.status, 'GAME_OVER');
-  assert.equal(collision.player.q, 1);
-  assert.equal(collision.player.deliveredPollen, 0);
-  assert.equal(getReproductiveScore(collision).score, 0);
-  const exhausted = { ...state, map: new Map([['0,0', tile(0, 0, TerrainType.NEST)], ['1,0', tile(1, 0)]]), player: { ...state.player, q: 1, energy: 10 } };
-  const arrival = move(exhausted, 0, 0, safe);
-  assert.equal(arrival.status, 'GAME_OVER');
-  assert.equal(arrival.player.deliveredPollen, 0);
-});
-
-test('carrying capacity limits retained pollen, while feeding can still restore energy', () => {
-  const state = scenario([tile(0, 0)]);
-  state.player.carriedPollen = state.species!.carryingCapacity - 2;
-  state.player.energy = 50;
-  const result = forage(state);
-  assert.equal(result.player.carriedPollen, state.species!.carryingCapacity);
-  assert.equal(result.player.pollen, 12);
-  assert.equal(result.player.energy, 50 - state.species!.energyCostForage + 12 * 4);
-  assert.match(result.player.history.at(-1)!.event, /excess resources/);
-});
-
-test('hoverfly feeding accumulates a bounded reserve but no reproductive output', () => {
-  const state = scenario([tile(0, 0)], SpeciesType.HOVERFLY);
-  state.player.floralReserve = FLORAL_RESERVE_CAPACITY - 1;
-  const fed = forage(state);
-  assert.equal(fed.player.floralReserve, FLORAL_RESERVE_CAPACITY);
-  assert.equal(fed.player.carriedPollen, 0);
-  assert.equal(fed.player.ovipositionBatches, 0);
-  assert.equal(getReproductiveScore(fed).score, 0);
-});
-
-test('oviposition requires the hoverfly, suitable aphid habitat, reserve and energy', () => {
-  const aphids = tile(0, 0, TerrainType.CROP, { aphids: true, resourceQuality: 0 });
-  const bee = scenario([aphids]);
-  assert.match(getOvipositionBlockReason(bee)!, /Only the hoverfly/);
-  const empty = scenario([tile(0, 0)], SpeciesType.HOVERFLY);
-  assert.match(getOvipositionBlockReason(empty)!, /aphid-bearing/);
-  const hungry = scenario([aphids], SpeciesType.HOVERFLY);
-  assert.match(getOvipositionBlockReason(hungry)!, /Feed on flowers/);
-  const tired = { ...hungry, player: { ...hungry.player, floralReserve: OVIPOSITION_RESOURCE_COST, energy: OVIPOSITION_ENERGY_COST - 1 } };
-  assert.match(getOvipositionBlockReason(tired)!, /energy/);
-  for (const state of [bee, empty, hungry, tired]) {
-    const result = oviposit(state);
-    assert.equal(result.player.ovipositionBatches, 0);
-    assert.equal(result.player.energy, state.player.energy);
-    assert.deepEqual(result.metrics, state.metrics);
+test('bees gain reproductive output from foraging immediately without a nest delivery', () => {
+  for (const [species, gathered, harvest] of [
+    [SpeciesType.BUMBLEBEE, 48, 12],
+    [SpeciesType.SOLITARY_BEE, 56, 9],
+  ] as const) {
+    const state = scenario([tile(0, 0), tile(1, 0, TerrainType.NEST)], species);
+    state.player.pollen = gathered;
+    assert.equal(getReproductiveScore(state).score, 0);
+    const fed = forage(state);
+    assert.equal(fed.player.pollen, gathered + harvest);
+    assert.equal(getReproductiveScore(fed).score, 1);
+    assert.equal(state.player.pollen, gathered, 'foraging must not mutate prior state');
+    const home = move(fed, 1, 0, safe);
+    assert.equal(home.player.pollen, fed.player.pollen);
+    assert.equal(getReproductiveScore(home).score, 1, 'nest arrival does not add or unlock resources');
   }
-  assert.equal(canForage(hungry), false, 'a non-flowering aphid patch is not food');
 });
 
-test('oviposition consumes adult reserve once per patch each day, separately from feeding', () => {
-  const state = scenario([tile(0, 0, TerrainType.CROP, { aphids: true, resourceQuality: 0 })], SpeciesType.HOVERFLY);
-  state.player.floralReserve = 20;
-  const laid = oviposit(state);
-  assert.equal(laid.player.floralReserve, 20 - OVIPOSITION_RESOURCE_COST);
-  assert.equal(laid.player.energy, 100 - OVIPOSITION_ENERGY_COST);
-  assert.equal(laid.player.ovipositionBatches, 1);
-  assert.ok(getReproductiveScore(laid).score > 0);
-  assert.match(getOvipositionBlockReason(laid)!, /already been used/);
-  assert.equal(oviposit(laid).player.ovipositionBatches, 1);
-  const nextDay = endDay(laid, safe);
-  assert.equal(getOvipositionBlockReason(nextDay), null);
-  assert.equal(oviposit(nextDay).player.ovipositionBatches, 2);
-  assert.equal(state.map.get('0,0')!.lastOvipositionDay, null);
+test('all species keep cumulative forage without carrying or reserve limits', () => {
+  for (const [species, harvest] of [
+    [SpeciesType.BUMBLEBEE, 12],
+    [SpeciesType.SOLITARY_BEE, 9],
+    [SpeciesType.HOVERFLY, 6],
+  ] as const) {
+    let state = scenario(Array.from({ length: 8 }, (_, q) => tile(q, 0)), species);
+    for (let q = 0; q < 8; q++) {
+      if (q > 0) state = move(state, q, 0, safe);
+      state = forage(state);
+    }
+    assert.equal(state.player.pollen, harvest * 8);
+    assert.equal(state.metrics.forageVisits, 8);
+    assert.equal(state.day, 1);
+    assert.ok(getReproductiveScore(state).score > 0);
+  }
+});
+
+test('gathered resources and supported offspring remain recorded when a run ends in death', () => {
+  for (const species of Object.values(SpeciesType)) {
+    const state = scenario([tile(0, 0), tile(1, 0, TerrainType.ROAD)], species);
+    state.player.pollen = 130;
+    state.player.energy = state.species!.energyCostMove + 20;
+    const before = getReproductiveScore(state);
+    const dead = move(state, 1, 0, () => 0);
+    assert.equal(dead.status, 'GAME_OVER');
+    assert.equal(dead.player.pollen, 130);
+    assert.deepEqual(getReproductiveScore(dead), before);
+    const exhausted = { ...state, map: new Map([['0,0', tile(0, 0)], ['1,0', tile(1, 0, TerrainType.NEST)]]), player: { ...state.player, energy: state.species!.energyCostMove } };
+    const arrival = move(exhausted, 1, 0, safe);
+    assert.equal(arrival.status, 'GAME_OVER');
+    assert.equal(arrival.player.pollen, 130);
+    assert.deepEqual(getReproductiveScore(arrival), before);
+  }
+});
+
+test('hoverfly feeding supports eggs automatically from cumulative resources', () => {
+  const state = scenario([tile(0, 0)], SpeciesType.HOVERFLY);
+  state.player.pollen = 2;
+  const fed = forage(state);
+  assert.equal(fed.player.pollen, 8);
+  assert.deepEqual(getReproductiveScore(fed), { score: 2, label: 'Eggs supported' });
+  assert.equal(fed.player.energy, 100);
+  assert.equal(fed.day, 1);
+});
+
+test('hoverfly habitat bonus applies on the same or each adjacent aphid hex, not farther away', () => {
+  const nearby = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, -1], [-1, 1]];
+  for (const [q, r] of [...nearby, [2, 0], [0, -2], [2, -2]]) {
+    const atOrigin = q === 0 && r === 0;
+    const cells = [tile(0, 0, TerrainType.MEADOW, { aphids: atOrigin })];
+    if (!atOrigin) cells.push(tile(q, r, TerrainType.CROP, { aphids: true, resourceQuality: 0 }));
+    const state = scenario(cells, SpeciesType.HOVERFLY);
+    state.player.energy = 40;
+    const adjacent = hexDistance(state.player, { q, r }) <= 1;
+    assert.equal(hasNearbyAphids(state), adjacent);
+    const fed = forage(state);
+    assert.equal(fed.player.pollen, adjacent ? 9 : 6);
+    assert.equal(getReproductiveScore(fed).score, adjacent ? 3 : 2);
+    assert.equal(fed.player.energy, 60, 'habitat bonus does not create extra adult food energy');
+    assert.equal(state.player.pollen, 0);
+  }
+});
+
+test('aphid bonus is hoverfly-only, does not stack and cannot be farmed on depleted or non-flowering patches', () => {
+  const cells = [tile(0, 0, TerrainType.MEADOW, { aphids: true }), tile(1, 0, TerrainType.CROP, { aphids: true, resourceQuality: 0 })];
+  for (const [species, expected] of [[SpeciesType.BUMBLEBEE, 12], [SpeciesType.SOLITARY_BEE, 9], [SpeciesType.HOVERFLY, 9]] as const) {
+    const initial = scenario(cells, species);
+    const fed = forage(initial);
+    assert.equal(fed.player.pollen, expected);
+    const repeat = forage(fed);
+    assert.equal(repeat.player.pollen, expected);
+    assert.equal(repeat.player.energy, fed.player.energy);
+    assert.equal(repeat.metrics.forageVisits, 1);
+    const aphidPatch = move(fed, 1, 0, safe);
+    assert.equal(canForage(aphidPatch), false);
+    assert.equal(forage(aphidPatch).player.pollen, expected);
+    assert.doesNotMatch(fed.player.history.at(-1)!.event, /aphids eaten/i);
+  }
+});
+
+test('hoverfly bonus is rounded from the actual harvest after weather and toxicity reductions', () => {
+  const state = scenario([tile(0, 0, TerrainType.CROP, { aphids: true })], SpeciesType.HOVERFLY);
+  state.weather = Weather.CLOUDY;
+  state.player.toxicity = 16;
+  state.player.energy = 40;
+  // floor(80 × .8 × .8 × .1 × .75 × 1.5) = 5 food units; floor(5 × 1.5) = 7 credited units.
+  const fed = forage(state);
+  assert.equal(fed.player.pollen, 7);
+  assert.equal(fed.player.energy, 56);
+  assert.equal(getReproductiveScore(fed).score, 2);
 });
 
 test('hoverflies can shelter away from the central nest; bees cannot', () => {
@@ -378,32 +403,20 @@ test('weather schedule is independent of actions, species and treatment', () => 
 });
 
 
-test('reproductive outputs use representative pollen requirements and real egg counts', () => {
+test('reproductive outputs convert cumulative resource totals at each species threshold', () => {
   const bumblebee = scenario([tile(0, 0, TerrainType.NEST)]);
-  bumblebee.player.deliveredPollen = 119;
+  bumblebee.player.pollen = 119;
   assert.deepEqual(getReproductiveScore(bumblebee), { score: 1, label: 'Workers supported' });
-  bumblebee.player.deliveredPollen = 120;
+  bumblebee.player.pollen = 120;
   assert.equal(getReproductiveScore(bumblebee).score, 2);
   const solitary = scenario([tile(0, 0, TerrainType.NEST)], SpeciesType.SOLITARY_BEE);
-  solitary.player.deliveredPollen = 129;
+  solitary.player.pollen = 129;
   assert.deepEqual(getReproductiveScore(solitary), { score: 1, label: 'Nest cells provisioned' });
-  solitary.player.deliveredPollen = 130;
+  solitary.player.pollen = 130;
   assert.equal(getReproductiveScore(solitary).score, 2);
   const fly = scenario([tile(0, 0)], SpeciesType.HOVERFLY);
-  fly.player.ovipositionBatches = 3;
-  assert.deepEqual(getReproductiveScore(fly), { score: 30, label: 'Eggs laid' });
-});
-
-test('daily egg cap applies across patches and resets only when a new day begins', () => {
-  const state = scenario([tile(0, 0, TerrainType.CROP, { aphids: true, resourceQuality: 0 })], SpeciesType.HOVERFLY);
-  state.player.floralReserve = 20;
-  state.player.eggsLaidToday = MAX_EGGS_PER_DAY - EGGS_PER_OVIPOSITION;
-  const laid = oviposit(state);
-  assert.equal(laid.player.eggsLaidToday, MAX_EGGS_PER_DAY);
-  const otherPatch = { ...laid, map: new Map([['0,0', tile(0, 0, TerrainType.CROP, { aphids: true })]]) };
-  assert.match(getOvipositionBlockReason(otherPatch)!, /Daily egg-laying limit/);
-  assert.equal(oviposit(otherPatch).player.ovipositionBatches, 1);
-  const tomorrow = endDay(laid, safe);
-  assert.equal(tomorrow.player.eggsLaidToday, 0);
-  assert.equal(getOvipositionBlockReason(tomorrow), null);
+  fly.player.pollen = 8;
+  assert.deepEqual(getReproductiveScore(fly), { score: 2, label: 'Eggs supported' });
+  fly.player.pollen = 9;
+  assert.equal(getReproductiveScore(fly).score, 3);
 });

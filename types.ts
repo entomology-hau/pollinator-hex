@@ -8,13 +8,13 @@ export interface SpeciesStats {
   name: SpeciesType; description: string; maxEnergy: number; energyCostMove: number;
   energyCostForage: number; forageEfficiency: number; pesticideResilience: number;
   maxToxicity: number; flightRange: number; traits: string[];
-  carryingCapacity: number; dailyMaintenance: number;
+  dailyMaintenance: number;
 }
 export interface HexCell {
   q: number; r: number; type: TerrainType; isRevealed: boolean;
   hasForagedToday: boolean; lastForagedDay: number | null;
   pesticideLevel: number; resourceQuality: number;
-  aphids: boolean; lastOvipositionDay: number | null; flowerStrip: boolean;
+  aphids: boolean; flowerStrip: boolean;
 }
 export interface RunMetrics {
   distance: number; forageVisits: number; exposureEvents: number; toxicityAccumulated: number;
@@ -25,8 +25,7 @@ export interface GameState {
   species: SpeciesStats | null; config: RunConfig; weatherSchedule: Weather[];
   riskVisits: Record<string, number>; metrics: RunMetrics;
   player: {
-    energy: number; pollen: number; carriedPollen: number; deliveredPollen: number;
-    floralReserve: number; ovipositionBatches: number; eggsLaidToday: number; toxicity: number;
+    energy: number; pollen: number; toxicity: number;
     q: number; r: number; isAlive: boolean; deathReason?: string;
     history: { day: number; event: string }[];
   };
@@ -35,8 +34,9 @@ export interface GameState {
 export interface TrialResult {
   id: string; modelVersion: string; finishedAt: string; config: RunConfig; species: SpeciesType;
   survived: boolean; dayReached: number; completedDays: number; causeOfDeath: string;
-  resourcesCollected: number; carriedPollen: number; deliveredPollen: number;
-  floralReserve: number; ovipositionBatches: number; score: number; scoreLabel: string;
+  resourcesCollected: number; score: number; scoreLabel: string;
+  /** Retained only when reading saved results from the previous model. */
+  carriedPollen?: number; deliveredPollen?: number; floralReserve?: number; ovipositionBatches?: number;
   energyRemaining: number; toxicity: number; metrics: RunMetrics;
   settings: string; weatherSchedule: Weather[]; history: { day: number; event: string }[];
 }

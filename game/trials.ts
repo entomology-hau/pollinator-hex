@@ -4,7 +4,7 @@ import { getReproductiveScore, ROAD_COLLISION_CHANCE, ROAD_COLLISION_ENERGY_LOSS
 import { SCENARIOS } from './scenarios';
 
 export const TRIAL_STORAGE_KEY = 'pollinator-hex-trials';
-export const TRIAL_STORAGE_VERSION = 1;
+export const TRIAL_STORAGE_VERSION = 2;
 export const MAX_SAVED_TRIALS = 100;
 export interface TrialStorage { getItem(key: string): string | null; setItem(key: string, value: string): void }
 export interface LoadedTrials { results: TrialResult[]; error: string | null }
@@ -21,8 +21,6 @@ export const createTrialResult = (state: GameState, finishedAt = new Date().toIS
     config: { ...state.config }, species: state.species.name,
     survived: state.player.isAlive, dayReached: state.day, completedDays: state.metrics.completedDays,
     causeOfDeath: state.player.deathReason ?? '', resourcesCollected: state.player.pollen,
-    carriedPollen: state.player.carriedPollen, deliveredPollen: state.player.deliveredPollen,
-    floralReserve: state.player.floralReserve, ovipositionBatches: state.player.ovipositionBatches,
     score: outcome.score, scoreLabel: outcome.label, energyRemaining: state.player.energy,
     toxicity: state.player.toxicity, metrics: { ...state.metrics },
     settings: JSON.stringify({
@@ -54,8 +52,12 @@ export const isTrialResult = (value: unknown): value is TrialResult => {
     || !text(value.finishedAt) || !Number.isFinite(Date.parse(value.finishedAt)) || !isRunConfig(value.config)
     || !Object.values(SpeciesType).includes(value.species as SpeciesType) || typeof value.survived !== 'boolean'
     || !text(value.causeOfDeath) || !text(value.scoreLabel) || !text(value.settings)) return false;
-  for (const key of ['dayReached', 'completedDays', 'resourcesCollected', 'carriedPollen', 'deliveredPollen', 'floralReserve', 'ovipositionBatches', 'score', 'energyRemaining', 'toxicity']) {
+  for (const key of ['dayReached', 'completedDays', 'resourcesCollected', 'score', 'energyRemaining', 'toxicity']) {
     if (!number(value[key])) return false;
+  }
+  // Preserve original quantities in older records without requiring them in the simpler model.
+  for (const key of ['carriedPollen', 'deliveredPollen', 'floralReserve', 'ovipositionBatches']) {
+    if ((value.modelVersion === '2.0' || value[key] !== undefined) && !number(value[key])) return false;
   }
   if (!count(value.dayReached) || value.dayReached < 1 || !count(value.completedDays) || !record(value.metrics)
     || metricKeys.some(key => !number((value.metrics as Record<string, unknown>)[key]))
@@ -73,7 +75,7 @@ export const loadTrials = (storage?: TrialStorage): LoadedTrials => {
     const saved = target.getItem(TRIAL_STORAGE_KEY);
     if (saved === null) return { results: [], error: null };
     const parsed: unknown = JSON.parse(saved);
-    if (!record(parsed) || parsed.version !== TRIAL_STORAGE_VERSION || !Array.isArray(parsed.results)
+    if (!record(parsed) || (parsed.version !== 1 && parsed.version !== TRIAL_STORAGE_VERSION) || !Array.isArray(parsed.results)
       || !parsed.results.every(isTrialResult) || new Set(parsed.results.map(result => result.id)).size !== parsed.results.length) {
       return { results: [], error: 'Saved trial data could not be read. It has not been changed; export any new results before clearing history.' };
     }
@@ -104,21 +106,33 @@ export const csvCell = (value: CsvValue): string => {
 };
 const csv = (rows: CsvValue[][]): string => '\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\r\n') + '\r\n';
 
-export const resultsToCsv = (results: TrialResult[]): string => csv([
-  ['trial_id', 'model_version', 'completed_at_utc', 'scenario_id', 'condition', 'seed', 'trial_number', 'pollinator', 'survived_season', 'day_reached', 'days_completed', 'cause_of_death', 'resources_collected', 'pollen_carried_mg_equivalent', 'pollen_delivered_mg_equivalent', 'floral_reserve', 'oviposition_bouts', 'reproductive_output', 'output_unit', 'energy_remaining', 'toxicity_load', 'distance_hexes', 'forage_visits', 'exposure_events', 'toxicity_accumulated', 'road_collisions', 'energy_spent', 'weather_schedule', 'settings_json'],
-  ...results.map(result => [
-    result.id, result.modelVersion, result.finishedAt, result.config.scenarioId, result.config.treatment, result.config.seed, result.config.trial,
-    result.species, result.survived, result.dayReached, result.completedDays, result.causeOfDeath, result.resourcesCollected,
-    result.carriedPollen, result.deliveredPollen, result.floralReserve, result.ovipositionBatches, result.score, result.scoreLabel,
-    result.energyRemaining, result.toxicity, result.metrics.distance, result.metrics.forageVisits, result.metrics.exposureEvents,
-    result.metrics.toxicityAccumulated, result.metrics.collisions, result.metrics.energySpent, result.weatherSchedule.join('|'), result.settings,
-  ]),
-]);
+const legacyResourceDetails = (result: TrialResult): Record<string, number> => {
+  const details: Record<string, number> = {};
+  for (const key of ['carriedPollen', 'deliveredPollen', 'floralReserve', 'ovipositionBatches'] as const) {
+    if (result[key] !== undefined) details[key] = result[key]!;
+  }
+  return details;
+};
+
+export const resultsToCsv = (results: TrialResult[]): string => {
+  const hasLegacyDetails = results.some(result => Object.keys(legacyResourceDetails(result)).length > 0);
+  return csv([
+    ['run_id', 'model_version', 'completed_at_utc', 'scenario_id', 'condition', 'seed', 'pollinator', 'survived_season', 'day_reached', 'days_completed', 'cause_of_death', 'resources_collected', 'resource_unit', 'reproductive_output', 'output_unit', 'energy_remaining', 'toxicity_load', 'distance_hexes', 'forage_visits', 'exposure_events', 'toxicity_accumulated', 'road_collisions', 'energy_spent', 'weather_schedule', 'settings_json', ...(hasLegacyDetails ? ['legacy_resource_details_json'] : [])],
+    ...results.map(result => [
+      result.id, result.modelVersion, result.finishedAt, result.config.scenarioId, result.config.treatment, result.config.seed,
+      result.species, result.survived, result.dayReached, result.completedDays, result.causeOfDeath, result.resourcesCollected,
+      result.species === SpeciesType.HOVERFLY ? 'resource units' : 'mg pollen-equivalent', result.score, result.scoreLabel,
+      result.energyRemaining, result.toxicity, result.metrics.distance, result.metrics.forageVisits, result.metrics.exposureEvents,
+      result.metrics.toxicityAccumulated, result.metrics.collisions, result.metrics.energySpent, result.weatherSchedule.join('|'), result.settings,
+      ...(hasLegacyDetails ? [Object.keys(legacyResourceDetails(result)).length ? JSON.stringify(legacyResourceDetails(result)) : ''] : []),
+    ]),
+  ]);
+};
 
 export const eventsToCsv = (results: TrialResult[]): string => csv([
-  ['trial_id', 'model_version', 'scenario_id', 'condition', 'seed', 'trial_number', 'pollinator', 'event_number', 'day', 'event'],
+  ['run_id', 'model_version', 'scenario_id', 'condition', 'seed', 'pollinator', 'event_number', 'day', 'event'],
   ...results.flatMap(result => result.history.map((entry, index) => [
-    result.id, result.modelVersion, result.config.scenarioId, result.config.treatment, result.config.seed, result.config.trial,
+    result.id, result.modelVersion, result.config.scenarioId, result.config.treatment, result.config.seed,
     result.species, index + 1, entry.day, entry.event,
   ])),
 ]);
