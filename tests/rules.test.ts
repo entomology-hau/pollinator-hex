@@ -510,23 +510,23 @@ test('weather schedule is independent of actions, species and treatment', () => 
 
 
 test('reproductive outputs count whole offspring at each scaled species threshold', () => {
-  for (const [species, unitsPerOffspring, label] of [
-    [SpeciesType.BUMBLEBEE, 4, 'Workers supported'],
-    [SpeciesType.SOLITARY_BEE, 52, 'Nest cells provisioned'],
-    [SpeciesType.HOVERFLY, 3, 'Eggs supported'],
+  for (const [species, boundaries, label] of [
+    [SpeciesType.BUMBLEBEE, [[3, 0], [4, 1], [6, 1], [7, 2], [9, 2], [10, 3]], 'Workers supported'],
+    [SpeciesType.SOLITARY_BEE, [[43, 0], [44, 1], [86, 1], [87, 2]], 'Nest cells provisioned'],
+    [SpeciesType.HOVERFLY, [[2, 0], [3, 1], [5, 1], [6, 2]], 'Eggs supported'],
   ] as const) {
     const state = scenario([tile(0, 0, TerrainType.NEST)], species);
-    for (const [rawUnits, score] of [[unitsPerOffspring - 1, 0], [unitsPerOffspring, 1], [2 * unitsPerOffspring - 1, 1], [2 * unitsPerOffspring, 2]]) {
+    for (const [rawUnits, score] of boundaries) {
       state.player.pollen = rawUnits;
       assert.deepEqual(getReproductiveScore(state), { score, label });
     }
   }
 });
 
-test('strong-season resource totals support approximately 300 workers and 30 nest cells', () => {
+test('strong-season resource totals support 368 workers and 37 nest cells', () => {
   for (const [species, rawUnits, pollenMg, offspring] of [
-    [SpeciesType.BUMBLEBEE, 1227, 18405, 306],
-    [SpeciesType.SOLITARY_BEE, 1605, 2006.25, 30],
+    [SpeciesType.BUMBLEBEE, 1227, 22086, 368],
+    [SpeciesType.SOLITARY_BEE, 1605, 2407.5, 37],
   ] as const) {
     const state = scenario([tile(0, 0, TerrainType.NEST)], species);
     state.player.pollen = rawUnits;
@@ -538,8 +538,8 @@ test('strong-season resource totals support approximately 300 workers and 30 nes
 
 test('reproductive scaling changes displayed pollen without changing forage or food energy', () => {
   for (const [species, rawHarvest, displayQuantity, energyAfter, resourceDescription] of [
-    [SpeciesType.BUMBLEBEE, 12, 180, 51, '180 mg pollen-equivalent'],
-    [SpeciesType.SOLITARY_BEE, 9, 11.25, 51.5, '11.25 mg pollen-equivalent'],
+    [SpeciesType.BUMBLEBEE, 12, 216, 51, '216 mg pollen-equivalent'],
+    [SpeciesType.SOLITARY_BEE, 9, 13.5, 51.5, '13.5 mg pollen-equivalent'],
     [SpeciesType.HOVERFLY, 6, 6, 49, '6 floral resource units'],
   ] as const) {
     const state = scenario([tile(0, 0)], species);
