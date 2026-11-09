@@ -1,6 +1,6 @@
 import {
-  BUMBLEBEE_POLLEN_PER_WORKER_MG, EGGS_PER_OVIPOSITION, ENERGY_PER_RESOURCE, FLORAL_RESERVE_CAPACITY, MAX_DAYS, MAX_EGGS_PER_DAY, OVIPOSITION_ENERGY_COST,
-  OVIPOSITION_RESOURCE_COST, POLLEN_MG_PER_UNIT, RESOURCE_REGEN_DAYS, SOLITARY_POLLEN_PER_CELL_MG, START_ENERGY, WEATHER_EFFECTS
+  BUMBLEBEE_POLLEN_PER_WORKER_MG, ENERGY_PER_RESOURCE, HOVERFLY_APHID_BONUS_MULTIPLIER, HOVERFLY_RESOURCES_PER_EGG,
+  MAX_DAYS, POLLEN_MG_PER_UNIT, RESOURCE_REGEN_DAYS, SOLITARY_POLLEN_PER_CELL_MG, START_ENERGY, WEATHER_EFFECTS
 } from '../constants';
 import { GameState, HexCell, RunConfig, SpeciesStats, SpeciesType, TerrainType, Weather } from '../types';
 import { createScenario, DEFAULT_CONFIG, normaliseConfig } from './scenarios';
@@ -52,8 +52,7 @@ export const createInitialState = (): GameState => ({
   config: { ...DEFAULT_CONFIG }, weatherSchedule: [], riskVisits: {},
   metrics: { distance: 0, forageVisits: 0, exposureEvents: 0, toxicityAccumulated: 0, collisions: 0, energySpent: 0, completedDays: 0 },
   player: {
-    energy: START_ENERGY, pollen: 0, carriedPollen: 0, deliveredPollen: 0,
-    floralReserve: 0, ovipositionBatches: 0, eggsLaidToday: 0, toxicity: 0,
+    energy: START_ENERGY, pollen: 0, toxicity: 0,
     q: 0, r: 0, isAlive: true, history: []
   },
   map: new Map()
@@ -66,7 +65,7 @@ export const startGame = (species: SpeciesStats, config: RunConfig = DEFAULT_CON
     ...createInitialState(), status: 'PLAYING', species, config: settings, ...environment, weather,
     player: {
       ...createInitialState().player, energy: species.maxEnergy,
-      history: [{ day: 1, event: `Season begins. Weather is ${weather.toLowerCase()}. ${species.name === SpeciesType.HOVERFLY ? 'Feed on flowers, then find aphid patches for oviposition.' : 'Collect pollen and return it to the nest.'}` }]
+      history: [{ day: 1, event: `Season begins. Weather is ${weather.toLowerCase()}. Forage for food and reproductive resources.${species.name === SpeciesType.HOVERFLY ? ' Flowers near aphids give an automatic habitat bonus.' : ''}` }]
     }
   };
 };
@@ -80,7 +79,7 @@ const finishIfDead = (state: GameState, energyReason = 'Starvation'): GameState 
   const deathReason = energy <= 0 ? energyReason : toxicity >= state.species.maxToxicity ? 'Pesticide Accumulation' : undefined;
   const next = { ...state, player: { ...state.player, energy, toxicity } };
   if (!deathReason) return next;
-  return log({ ...next, status: 'GAME_OVER', player: { ...next.player, isAlive: false, deathReason } }, `Simulation ended: ${deathReason.toLowerCase()}.${!isHoverfly(state) && state.player.carriedPollen > 0 ? ' Undelivered pollen does not count towards nest provisioning.' : ''}`);
+  return log({ ...next, status: 'GAME_OVER', player: { ...next.player, isAlive: false, deathReason } }, `Simulation ended: ${deathReason.toLowerCase()}.`);
 };
 export const estimateMoveCost = (state: GameState, distance: number): number => {
   if (!state.species) return 0;
@@ -156,16 +155,10 @@ export const move = (state: GameState, q: number, r: number, rng?: RandomSource)
     next = finishIfDead(next, collision ? 'Vehicle Collision' : 'Starvation');
     if (next.status === 'GAME_OVER') return next;
   }
-  let deliveryNote = '';
-  if (!isHoverfly(next) && map.get(`${q},${r}`)?.type === TerrainType.NEST && next.player.carriedPollen > 0) {
-    const delivered = next.player.carriedPollen;
-    next = { ...next, player: { ...next.player, carriedPollen: 0, deliveredPollen: next.player.deliveredPollen + delivered } };
-    deliveryNote = ` Delivered ${delivered * POLLEN_MG_PER_UNIT} mg pollen-equivalent to the nest.`;
-  }
   const waterNote = map.get(`${q},${r}`)?.type === TerrainType.WATER ? ' Water provides no food or detoxification.' : '';
   const collisionNote = collisions ? ` Warning: ${collisions} vehicle ${collisions === 1 ? 'collision' : 'collisions'} cost ${collisions * ROAD_COLLISION_ENERGY_LOSS} extra energy.` : '';
   const exposureNote = totalExposure > 0 ? ` Pesticide exposure: +${totalExposure.toFixed(1)} toxicity.` : '';
-  return log(next, `Moved ${preview.distance} ${preview.distance === 1 ? 'hex' : 'hexes'} to (${q}, ${r}); flight cost ${preview.energyCost.toFixed(1)} energy.${deliveryNote}${collisionNote}${exposureNote}${waterNote}`);
+  return log(next, `Moved ${preview.distance} ${preview.distance === 1 ? 'hex' : 'hexes'} to (${q}, ${r}); flight cost ${preview.energyCost.toFixed(1)} energy.${collisionNote}${exposureNote}${waterNote}`);
 };
 
 export const getForageBlockReason = (state: GameState): string | null => {
@@ -178,6 +171,11 @@ export const getForageBlockReason = (state: GameState): string | null => {
   return null;
 };
 export const canForage = (state: GameState): boolean => getForageBlockReason(state) === null;
+
+/** Aphids are potential larval prey; they are not food for the adult hoverfly. */
+export const hasNearbyAphids = (state: GameState, position: HexCoordinate = state.player): boolean =>
+  [...state.map.values()].some(cell => cell.aphids && hexDistance(position, cell) <= 1);
+
 export const forage = (state: GameState): GameState => {
   if (!isPlaying(state)) return state;
   const reason = getForageBlockReason(state);
@@ -188,9 +186,8 @@ export const forage = (state: GameState): GameState => {
   const exposure = cell.pesticideLevel * 5 * (1 - species.pesticideResilience);
   const map = new Map(state.map);
   map.set(cellKey, { ...cell, lastForagedDay: state.day, hasForagedToday: true });
-  const stored = isHoverfly(state)
-    ? Math.min(amount, Math.max(0, FLORAL_RESERVE_CAPACITY - state.player.floralReserve))
-    : Math.min(amount, Math.max(0, species.carryingCapacity - state.player.carriedPollen));
+  const hasHabitatBonus = isHoverfly(state) && hasNearbyAphids(state);
+  const credited = hasHabitatBonus ? Math.floor(amount * HOVERFLY_APHID_BONUS_MULTIPLIER) : amount;
   const next = {
     ...state, map,
     metrics: { ...state.metrics, forageVisits: state.metrics.forageVisits + 1,
@@ -199,42 +196,12 @@ export const forage = (state: GameState): GameState => {
       toxicityAccumulated: state.metrics.toxicityAccumulated + exposure },
     player: { ...state.player,
       energy: state.player.energy - species.energyCostForage + amount * ENERGY_PER_RESOURCE,
-      pollen: state.player.pollen + amount,
-      carriedPollen: state.player.carriedPollen + (isHoverfly(state) ? 0 : stored),
-      floralReserve: state.player.floralReserve + (isHoverfly(state) ? stored : 0),
+      pollen: state.player.pollen + credited,
       toxicity: state.player.toxicity + exposure }
   };
   const resource = isHoverfly(state) ? `${amount} floral resource units` : `${amount * POLLEN_MG_PER_UNIT} mg pollen-equivalent`;
-  const storeNote = isHoverfly(state) ? ` Stored ${stored} units for oviposition.` : ` Added ${stored * POLLEN_MG_PER_UNIT} mg pollen-equivalent to the carried load; return to the nest to provision it.`;
-  const fullNote = stored < amount ? ' Storage limit reached; excess resources are not retained.' : '';
-  return finishIfDead(log(next, `Fed on flowers: ${resource}; food supplies ${amount * ENERGY_PER_RESOURCE} energy before capacity limits, at a cost of ${species.energyCostForage}.${storeNote}${fullNote}${impaired ? ' Yield reduced by toxicity.' : ''}${exposure > 0 ? ` Exposure: +${exposure.toFixed(1)} toxicity.` : ''}`));
-};
-
-export const getOvipositionBlockReason = (state: GameState): string | null => {
-  if (!isPlaying(state)) return 'Start a simulation to lay eggs.';
-  if (!isHoverfly(state)) return 'Only the hoverfly can use aphid patches for oviposition.';
-  if (state.player.eggsLaidToday + EGGS_PER_OVIPOSITION > MAX_EGGS_PER_DAY) return `Daily egg-laying limit reached (${MAX_EGGS_PER_DAY} eggs). End the day before laying more.`;
-  const cell = state.map.get(keyOf(state.player));
-  if (!cell?.aphids) return 'Find an aphid-bearing patch for oviposition.';
-  if (cell.lastOvipositionDay === state.day) return 'This patch has already been used for oviposition today.';
-  if (state.player.floralReserve < OVIPOSITION_RESOURCE_COST) return `Feed on flowers first: oviposition needs ${OVIPOSITION_RESOURCE_COST} stored floral resource units.`;
-  if (state.player.energy < OVIPOSITION_ENERGY_COST) return `Oviposition needs ${OVIPOSITION_ENERGY_COST} energy.`;
-  return null;
-};
-export const oviposit = (state: GameState): GameState => {
-  if (!isPlaying(state)) return state;
-  const reason = getOvipositionBlockReason(state);
-  if (reason) return log(state, reason);
-  const key = keyOf(state.player), cell = state.map.get(key)!;
-  const map = new Map(state.map);
-  map.set(key, { ...cell, lastOvipositionDay: state.day });
-  return finishIfDead(log({
-    ...state, map,
-    metrics: { ...state.metrics, energySpent: state.metrics.energySpent + OVIPOSITION_ENERGY_COST },
-    player: { ...state.player, energy: state.player.energy - OVIPOSITION_ENERGY_COST,
-      floralReserve: state.player.floralReserve - OVIPOSITION_RESOURCE_COST,
-      ovipositionBatches: state.player.ovipositionBatches + 1, eggsLaidToday: state.player.eggsLaidToday + EGGS_PER_OVIPOSITION }
-  }, `Laid ${EGGS_PER_OVIPOSITION} eggs at an aphid patch, using ${OVIPOSITION_RESOURCE_COST} floral resource units and ${OVIPOSITION_ENERGY_COST} energy. Larval survival and pest suppression are not simulated.`));
+  const bonusNote = hasHabitatBonus && credited > amount ? ` Nearby aphids add ${credited - amount} reproductive resource units: prey for future larvae, not food for the adult.` : '';
+  return finishIfDead(log(next, `Foraged ${resource}.${bonusNote} Food provides ${amount * ENERGY_PER_RESOURCE} energy; foraging costs ${species.energyCostForage}.${impaired ? ' Yield reduced by toxicity.' : ''}${exposure > 0 ? ` Exposure: +${exposure.toFixed(1)} toxicity.` : ''}`));
 };
 
 export const isSafeShelter = (state: GameState): boolean => {
@@ -255,20 +222,20 @@ export const endDay = (state: GameState, rng?: RandomSource): GameState => {
     return finishIfDead({ ...next, player: { ...next.player, energy: 0 } }, 'Predation during night');
   }
   next = log({ ...next, metrics: { ...next.metrics, completedDays: next.metrics.completedDays + 1 } }, sheltered ? 'Sheltered safely for the night.' : 'Survived the night in the open.');
-  if (state.day >= MAX_DAYS) return log({ ...next, status: 'GAME_OVER' }, 'Season complete. Review survival and the resources delivered or oviposition achieved.');
+  if (state.day >= MAX_DAYS) return log({ ...next, status: 'GAME_OVER' }, 'Season complete. Review survival, gathered resources and reproductive output.');
   const day = state.day + 1;
   const map = new Map(state.map);
   for (const [key, cell] of map) if (cell.lastForagedDay !== null && day - cell.lastForagedDay >= RESOURCE_REGENERATION_DAYS) {
     map.set(key, { ...cell, lastForagedDay: null, hasForagedToday: false });
   }
-  next = { ...next, day, map, weather: state.weatherSchedule[day - 1] ?? Weather.SUNNY, player: { ...next.player, eggsLaidToday: 0 } };
+  next = { ...next, day, map, weather: state.weatherSchedule[day - 1] ?? Weather.SUNNY };
   return log(next, `Day ${day}: ${next.weather.toLowerCase()} weather. Maintenance cost: ${maintenance} energy each day.`);
 };
 
 /** Fictional game outputs informed by representative pollen requirements, not demographic predictions. */
 export const getReproductiveScore = (state: GameState): { score: number; label: string } => {
-  if (isHoverfly(state)) return { score: state.player.ovipositionBatches * EGGS_PER_OVIPOSITION, label: 'Eggs laid' };
-  const pollenMg = state.player.deliveredPollen * POLLEN_MG_PER_UNIT;
+  if (isHoverfly(state)) return { score: Math.floor(state.player.pollen / HOVERFLY_RESOURCES_PER_EGG), label: 'Eggs supported' };
+  const pollenMg = state.player.pollen * POLLEN_MG_PER_UNIT;
   return state.species?.name === SpeciesType.SOLITARY_BEE
     ? { score: Math.floor(pollenMg / SOLITARY_POLLEN_PER_CELL_MG), label: 'Nest cells provisioned' }
     : { score: Math.floor(pollenMg / BUMBLEBEE_POLLEN_PER_WORKER_MG), label: 'Workers supported' };

@@ -1,30 +1,28 @@
 import React from 'react';
 import { GameState, HexCell, TerrainType, SpeciesType } from '../types';
-import { MAX_DAYS, WEATHER_EFFECTS, TERRAIN_CONFIG, FLORAL_RESERVE_CAPACITY, OVIPOSITION_RESOURCE_COST, OVIPOSITION_ENERGY_COST } from '../constants';
-import { getForageBlockReason, getOvipositionBlockReason, getReproductiveScore, isSafeShelter } from '../game/rules';
-import { Battery, CloudRain, Sun, Cloud, Flower, Skull, HelpCircle, LogOut, Egg, Home, Package } from 'lucide-react';
+import { MAX_DAYS, WEATHER_EFFECTS, TERRAIN_CONFIG, HOVERFLY_APHID_BONUS_MULTIPLIER } from '../constants';
+import { getForageBlockReason, getReproductiveScore, hasNearbyAphids, isSafeShelter } from '../game/rules';
+import { Battery, CloudRain, Sun, Cloud, Flower, Skull, HelpCircle, LogOut } from 'lucide-react';
 
 interface Props {
   gameState: GameState;
   currentHex: HexCell | undefined;
   onForage: () => void;
-  onOviposit: () => void;
   onRest: () => void;
   onOpenHelp: () => void;
   onExit: () => void;
 }
 
-export const HUD: React.FC<Props> = ({ gameState, currentHex, onForage, onOviposit, onRest, onOpenHelp, onExit }) => {
+export const HUD: React.FC<Props> = ({ gameState, currentHex, onForage, onRest, onOpenHelp, onExit }) => {
   if (!gameState.species || !currentHex) return null;
   const { player, weather, day, species } = gameState;
   const WeatherIcon = { SUNNY: Sun, RAINY: CloudRain, CLOUDY: Cloud }[weather];
   const terrain = TERRAIN_CONFIG[currentHex.type];
   const terrainLabel = currentHex.flowerStrip ? 'Flower strip' : currentHex.type === TerrainType.MEADOW && currentHex.resourceQuality === 0 ? 'Unflowering meadow' : terrain.label;
   const blockedReason = getForageBlockReason(gameState);
-  const ovipositionBlockedReason = getOvipositionBlockReason(gameState);
-  const atNest = currentHex.type === TerrainType.NEST;
   const hasFlowers = currentHex.resourceQuality > 0 && ![TerrainType.NEST, TerrainType.WATER, TerrainType.ROAD].includes(currentHex.type);
   const isHoverfly = species.name === SpeciesType.HOVERFLY;
+  const aphidBonus = isHoverfly && hasFlowers && hasNearbyAphids(gameState);
   const sheltered = isSafeShelter(gameState);
   const output = getReproductiveScore(gameState);
   const impaired = player.toxicity > species.maxToxicity * 0.5;
@@ -37,20 +35,16 @@ export const HUD: React.FC<Props> = ({ gameState, currentHex, onForage, onOvipos
         <dl className="space-y-3">
           <div><div className="flex justify-between gap-3 mb-1"><dt className="flex gap-2 items-center text-sm"><Battery className="w-4 h-4 text-emerald-300" aria-hidden="true" />Energy</dt><dd className="font-mono text-sm">{player.energy.toFixed(1)} / {species.maxEnergy}</dd></div><progress aria-label="Energy" value={player.energy} max={species.maxEnergy} className="w-full h-2 accent-emerald-400" /></div>
           <div><div className="flex justify-between gap-3 mb-1"><dt className="flex gap-2 items-center text-sm"><Skull className="w-4 h-4 text-purple-300" aria-hidden="true" />Toxicity</dt><dd className="font-mono text-sm">{player.toxicity.toFixed(1)} / {species.maxToxicity}</dd></div><progress aria-label="Toxicity" value={player.toxicity} max={species.maxToxicity} className="w-full h-2 accent-purple-400" /></div>
-          {isHoverfly ? (
-            <div className="border-t border-slate-700 pt-3"><div className="flex justify-between gap-3"><dt className="text-sm flex items-center gap-2"><Flower className="w-4 h-4 text-pink-300" aria-hidden="true" />Floral reserve</dt><dd className="font-mono text-sm">{player.floralReserve} / {FLORAL_RESERVE_CAPACITY}</dd></div><progress aria-label="Floral reserve for egg laying" value={player.floralReserve} max={FLORAL_RESERVE_CAPACITY} className="mt-2 w-full h-2 accent-pink-400" /></div>
-          ) : (
-            <>
-              <div className="border-t border-slate-700 pt-3"><div className="flex justify-between gap-3"><dt className="text-sm flex items-center gap-2"><Package className="w-4 h-4 text-pink-300" aria-hidden="true" />Pollen carried</dt><dd className="font-mono text-sm">{player.carriedPollen} / {species.carryingCapacity} mg equivalent</dd></div><progress aria-label="Pollen load" value={player.carriedPollen} max={species.carryingCapacity} className="mt-2 w-full h-2 accent-pink-400" /></div>
-              <div className="flex justify-between gap-3"><dt className="text-sm flex items-center gap-2"><Home className="w-4 h-4 text-emerald-300" aria-hidden="true" />Pollen delivered</dt><dd className="font-mono font-semibold text-emerald-200">{player.deliveredPollen} mg equivalent</dd></div>
-            </>
-          )}
+          <div className="border-t border-slate-700 pt-3 flex justify-between gap-3">
+            <dt className="text-sm flex items-center gap-2"><Flower className="w-4 h-4 text-pink-300" aria-hidden="true" />Resources gathered</dt>
+            <dd className="text-right"><span className="font-mono font-semibold text-emerald-200">{player.pollen}</span><span className="block text-xs text-slate-300">{isHoverfly ? 'resource units' : 'mg pollen-equivalent'}</span></dd>
+          </div>
         </dl>
         <div className="mt-4 rounded-lg border border-emerald-800 bg-emerald-950/30 p-3">
           <h3 className="text-xs text-emerald-200 font-semibold uppercase tracking-wide">Reproductive output</h3>
           <p className="mt-1 text-xl font-bold text-white">{output.score} <span className="text-sm font-normal text-emerald-100">{output.label}</span></p>
         </div>
-        <p className="text-xs text-slate-400 mt-3">Total gathered: {player.pollen} {isHoverfly ? 'floral resource units' : 'mg pollen-equivalent'}.</p>
+        <p className="text-xs text-slate-300 mt-3">Gathered resources contribute automatically to reproductive output.</p>
         {impaired && <p className="text-amber-200 text-sm mt-3">Impaired: flight costs 50% more; foraging yield is reduced by 25%.</p>}
       </section>
       <section className="bg-slate-900 border border-slate-700 p-4 rounded-xl" aria-label="Day and weather">
@@ -69,14 +63,10 @@ export const HUD: React.FC<Props> = ({ gameState, currentHex, onForage, onOvipos
           <div className="flex justify-between gap-3"><dt className="text-slate-300">Aphid patch</dt><dd>{currentHex.aphids ? 'Present' : 'Absent'}</dd></div>
           <div className="flex justify-between gap-3"><dt className="text-slate-300">Night shelter</dt><dd>{sheltered ? 'Safe for this pollinator' : 'Exposed'}</dd></div>
         </dl>
-        {!isHoverfly && <p className="text-sm text-emerald-200 mt-3">{atNest ? 'Loads are delivered automatically when you reach the nest alive.' : player.carriedPollen >= species.carryingCapacity ? 'Your load is full. Return to the nest to deliver it; you can still feed to recover energy.' : 'Return to the nest to deliver your pollen load.'}</p>}
+        {aphidBonus && <p className="text-sm text-pink-200 mt-3">Aphid bonus: +{Math.round((HOVERFLY_APHID_BONUS_MULTIPLIER - 1) * 100)}% resource credit when you forage here. Nearby aphids provide food for future larvae.</p>}
         <div className="mt-4 flex flex-col gap-3">
-          {!atNest && <button onClick={onForage} disabled={Boolean(blockedReason)} aria-describedby="forage-explanation" className="w-full rounded-lg px-3 py-3 font-bold bg-amber-400 hover:bg-amber-300 text-slate-950 disabled:bg-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed flex justify-center items-center gap-2"><Flower className="w-5 h-5" aria-hidden="true" />{isHoverfly ? 'Feed on flowers' : 'Forage and feed'}</button>}
-          <p id="forage-explanation" className="text-sm text-slate-300">{blockedReason || `Feeding costs ${species.energyCostForage} energy and replenishes energy from floral food.`}</p>
-          {isHoverfly && <>
-            <button onClick={onOviposit} disabled={Boolean(ovipositionBlockedReason)} aria-describedby="oviposition-explanation" className="w-full rounded-lg px-3 py-3 font-bold bg-pink-700 hover:bg-pink-600 text-white disabled:bg-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed flex justify-center items-center gap-2"><Egg className="w-5 h-5" aria-hidden="true" />Lay eggs</button>
-            <p id="oviposition-explanation" className="text-sm text-slate-300">{ovipositionBlockedReason || `Uses ${OVIPOSITION_RESOURCE_COST} floral reserve and ${OVIPOSITION_ENERGY_COST} energy. Each aphid patch can be used once per day.`}</p>
-          </>}
+          <button onClick={onForage} disabled={Boolean(blockedReason)} aria-describedby="forage-explanation" className="w-full rounded-lg px-3 py-3 font-bold bg-amber-400 hover:bg-amber-300 text-slate-950 disabled:bg-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed flex justify-center items-center gap-2"><Flower className="w-5 h-5" aria-hidden="true" />Forage</button>
+          <p id="forage-explanation" className="text-sm text-slate-300">{blockedReason || `Gather resources and recover energy from flowers. Foraging costs ${species.energyCostForage} energy.`}</p>
           <button onClick={onRest} className="w-full rounded-lg px-3 py-3 font-bold bg-emerald-700 hover:bg-emerald-600 text-white">{sheltered ? 'End day in shelter' : 'End day in the open'}</button>
           <p className={`text-xs ${player.energy <= species.dailyMaintenance ? 'text-red-300' : 'text-slate-300'}`}>{player.energy <= species.dailyMaintenance ? 'You do not have enough energy to survive daily maintenance. Find food before ending the day.' : `Ending the day uses ${species.dailyMaintenance} energy; resting does not feed you. ${sheltered ? 'This location protects you from night-time predation.' : 'There is a 15% risk of night-time predation here.'}`}</p>
         </div>

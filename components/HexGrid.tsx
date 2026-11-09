@@ -76,7 +76,7 @@ export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
     } else if (cell.isRevealed) {
       parts.push('No flowers');
     }
-    if (cell.isRevealed && cell.aphids) parts.push('Aphid patch, suitable for hoverfly egg laying');
+    if (cell.isRevealed && cell.aphids) parts.push('Aphid habitat: nearby flowers give hoverflies a resource bonus');
     if (cell.isRevealed && cell.flowerStrip) parts.push('Added floral resources');
     if (here) parts.push('Current location');
     else {
@@ -223,7 +223,7 @@ export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
             {selectedCell.isRevealed ? terrainLabel(selectedCell) : 'Unexplored terrain'}
             <span className="ml-2 font-normal text-slate-300">({selectedCell.q}, {selectedCell.r})</span>
           </p>
-          {selectedCell.isRevealed && <p className="mt-1 text-xs text-slate-300">{hasFlowers(selectedCell) ? `Flower quality: ${selectedCell.resourceQuality}%.` : 'No floral resources.'}{selectedCell.aphids ? ' Aphids present: hoverfly egg-laying site.' : ''}{selectedCell.pesticideLevel > 0 ? ` Exposure level: ${(selectedCell.pesticideLevel * 100).toFixed(0)}%.` : ' No pesticide exposure.'}</p>}
+          {selectedCell.isRevealed && <p className="mt-1 text-xs text-slate-300">{hasFlowers(selectedCell) ? `Flower quality: ${selectedCell.resourceQuality}%.` : 'No floral resources.'}{selectedCell.aphids ? ' Aphid habitat: nearby flowers give hoverflies a resource bonus.' : ''}{selectedCell.pesticideLevel > 0 ? ` Exposure level: ${(selectedCell.pesticideLevel * 100).toFixed(0)}%.` : ' No pesticide exposure.'}</p>}
           {keyOf(selectedCell.q, selectedCell.r) === playerKey ? (
             <p className="mt-1 text-slate-300">Your current location. Inspect another hex to preview a flight.</p>
           ) : <>
@@ -245,7 +245,7 @@ export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
             return <li key={type} className="flex items-center gap-1.5"><Icon aria-hidden="true" className="h-4 w-4" />{TERRAIN_CONFIG[type].label}</li>;
           })}
         </ul>
-        <p className="mt-2 flex items-center gap-1.5"><Bug aria-hidden="true" className="h-4 w-4 text-pink-200" /> Pink insect badge: aphid patch for egg laying.</p>
+        <p className="mt-2 flex items-center gap-1.5"><Bug aria-hidden="true" className="h-4 w-4 text-pink-200" /> Pink insect badge: aphid habitat; nearby flowers give hoverflies a resource bonus.</p>
         <p className="mt-2">Pink dashed border: flower strip. White dot: flowers available. Dash: flowers depleted. Question mark: unexplored.</p>
       </details>
       <p id="map-keyboard-help" className="mt-3 text-xs leading-relaxed text-slate-300">

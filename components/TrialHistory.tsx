@@ -20,11 +20,11 @@ export const TrialHistory: React.FC<Props> = ({ results, onReplay, onExportSumma
   return (
     <section className="w-full rounded-2xl border border-slate-700 bg-slate-900 p-4 text-left sm:p-6" aria-labelledby="trial-history-heading">
       <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
-        <h2 id="trial-history-heading" className="text-xl font-bold text-amber-200">Classroom trial history</h2>
+        <h2 id="trial-history-heading" className="text-xl font-bold text-amber-200">Saved results</h2>
         <p className="text-sm text-slate-300">{results.length} saved {results.length === 1 ? 'run' : 'runs'} · latest 100 kept</p>
       </div>
-      <p className="text-sm text-slate-300">Predict an effect, play both conditions with the same seed, then repeat with new seeds. Repeating a seed is practice or replay, not an independent replicate. Results are saved only in this browser.</p>
-      {results.length === 0 ? <p className="mt-4 text-sm text-slate-200">Finish a simulation to record your first trial. A run that ends in death is still a useful result.</p> : <>
+      <p className="text-sm text-slate-300">For your class graph, record the pollinator, condition and reproductive output. These results are saved only in this browser.</p>
+      {results.length === 0 ? <p className="mt-4 text-sm text-slate-200">Finish a simulation to save your first result. Include zero outcomes in your class graph.</p> : <>
         <div className="flex flex-wrap gap-3 my-4">
           <button type="button" onClick={onExportSummary} className="rounded-lg bg-amber-400 px-4 py-3 text-sm font-bold text-slate-950 hover:bg-amber-300">Export all {results.length} summaries (CSV)</button>
           <button type="button" onClick={onExportEvents} className="rounded-lg border border-slate-500 px-4 py-3 text-sm hover:bg-slate-800">Export all action histories (CSV)</button>
@@ -50,7 +50,7 @@ export const TrialHistory: React.FC<Props> = ({ results, onReplay, onExportSumma
             <p className="text-xs text-slate-300 mt-1">Model {group.modelVersion} · {group.outputLabel} · {group.matchedSeeds} {group.matchedSeeds === 1 ? 'seed has' : 'seeds have'} both conditions</p>
             <div className="overflow-x-auto mt-3" tabIndex={0} role="region" aria-label="Condition comparison">
               <table className="w-full text-sm min-w-[350px]">
-                <thead><tr className="border-b border-slate-700 text-slate-300"><th className="text-left py-2 pr-3" scope="col">Outcome</th><th className="text-right px-2" scope="col">Control</th><th className="text-right pl-2" scope="col">Intervention</th></tr></thead>
+                <thead><tr className="border-b border-slate-700 text-slate-300"><th className="text-left py-2 pr-3" scope="col">Outcome</th><th className="text-right px-2" scope="col">Control</th><th className="text-right pl-2" scope="col">Treatment</th></tr></thead>
                 <tbody className="text-slate-100">
                   <tr><th scope="row" className="text-left py-2 pr-3 font-normal">Runs / distinct seeds</th><td className="text-right px-2">{group.control.runs} / {group.control.seeds}</td><td className="text-right pl-2">{group.intervention.runs} / {group.intervention.seeds}</td></tr>
                   <tr><th scope="row" className="text-left py-2 pr-3 font-normal">Mean reproductive output</th><td className="text-right px-2">{value(group.control.meanScore)}</td><td className="text-right pl-2">{value(group.intervention.meanScore)}</td></tr>
@@ -59,30 +59,27 @@ export const TrialHistory: React.FC<Props> = ({ results, onReplay, onExportSumma
                 </tbody>
               </table>
             </div>
-            <p className="text-xs text-slate-300 mt-3">Control: {SCENARIOS[group.scenarioId].controlLabel}. Intervention: {SCENARIOS[group.scenarioId].interventionLabel}.</p>
+            <p className="text-xs text-slate-300 mt-3">Control: {SCENARIOS[group.scenarioId].controlLabel}. Treatment: {SCENARIOS[group.scenarioId].interventionLabel}.</p>
           </section>)}
         </div>
         {filtered.length > 0 ? <>
-          <p className="text-xs text-slate-300 mt-4">Means give each distinct seed equal weight within a condition. Reproductive outputs are fictionalised teaching quantities. These are descriptive summaries of all displayed seeds, not a paired statistical test; use the same seeds and comparable strategies in both conditions.</p>
+          <p className="text-xs text-slate-300 mt-4">Compare results from the same model version. Means give each distinct seed equal weight within a condition. Reproductive outputs are fictionalised teaching quantities. These are descriptive summaries of all displayed seeds, not a paired statistical test; use the same seeds and comparable strategies in both conditions.</p>
           <div className="mt-5 max-h-96 overflow-auto rounded-lg border border-slate-700" tabIndex={0} role="region" aria-label="Saved trial results; scroll horizontally for all columns">
-            <table className="w-full min-w-[1080px] text-sm">
+            <table className="w-full min-w-[880px] text-sm">
               <caption className="p-3 text-left text-slate-300">{filtered.length} displayed {filtered.length === 1 ? 'run' : 'runs'}, newest first. Export buttons include all saved runs.</caption>
-              <thead className="bg-slate-800 text-slate-200"><tr>{['Trial', 'Pollinator / scenario', 'Condition', 'Seed', 'Outcome', 'Reproductive output', 'Pollen delivered (mg equivalent)', 'Oviposition bouts', 'Distance (hexes)', 'Repeat'].map(label => <th key={label} scope="col" className="px-3 py-3 text-left font-semibold">{label}</th>)}</tr></thead>
+              <thead className="bg-slate-800 text-slate-200"><tr>{['Pollinator / scenario', 'Condition', 'Seed', 'Outcome', 'Reproductive output', 'Resources gathered', 'Repeat'].map(label => <th key={label} scope="col" className="px-3 py-3 text-left font-semibold">{label}</th>)}</tr></thead>
               <tbody>{[...filtered].reverse().map(result => <tr key={result.id} className="border-t border-slate-700 text-slate-200">
-                <th scope="row" className="px-3 py-3 text-left font-normal">{result.config.trial}<span className="block text-xs text-slate-400">v{result.modelVersion}</span></th>
-                <td className="px-3 py-3">{result.species}<span className="block text-xs text-slate-300">{SCENARIOS[result.config.scenarioId].title}</span></td>
-                <td className="px-3 py-3">{result.config.treatment === 'control' ? 'Control' : 'Intervention'}</td>
+                <th scope="row" className="px-3 py-3 text-left font-normal">{result.species}<span className="block text-xs text-slate-300">{SCENARIOS[result.config.scenarioId].title}</span><span className="block text-xs text-slate-400">Model {result.modelVersion}</span></th>
+                <td className="px-3 py-3">{result.config.treatment === 'control' ? 'Control' : 'Treatment'}</td>
                 <td className="px-3 py-3 max-w-40 break-words font-mono text-xs">{result.config.seed}</td>
                 <td className="px-3 py-3">{result.survived ? 'Season survived' : `Died on day ${result.dayReached}`}<span className="block text-xs text-slate-300">{result.causeOfDeath || `${result.completedDays} days completed`}</span></td>
                 <td className="px-3 py-3">{result.score}<span className="block text-xs text-slate-300">{result.scoreLabel}</span></td>
-                <td className="px-3 py-3">{result.species === SpeciesType.HOVERFLY ? '—' : result.deliveredPollen}</td>
-                <td className="px-3 py-3">{result.species === SpeciesType.HOVERFLY ? result.ovipositionBatches : '—'}</td>
-                <td className="px-3 py-3">{result.metrics.distance}</td>
-                <td className="px-3 py-3"><button type="button" onClick={() => onReplay({ ...result.config }, result.species)} className="whitespace-nowrap rounded-lg border border-slate-500 px-3 py-2 hover:bg-slate-800" aria-label={`Repeat trial ${result.config.trial}, ${result.species}, seed ${result.config.seed}`}>Repeat setup</button></td>
+                <td className="px-3 py-3">{result.resourcesCollected}<span className="block text-xs text-slate-300">{result.species === SpeciesType.HOVERFLY ? 'resource units' : 'mg pollen-equivalent'}</span></td>
+                <td className="px-3 py-3"><button type="button" onClick={() => onReplay({ ...result.config }, result.species)} className="whitespace-nowrap rounded-lg border border-slate-500 px-3 py-2 hover:bg-slate-800" aria-label={`Repeat ${result.species}, ${result.config.treatment === 'control' ? 'control' : 'treatment'}, seed ${result.config.seed}`}>Repeat setup</button></td>
               </tr>)}</tbody>
             </table>
           </div>
-          <p className="mt-4 text-sm text-amber-100">Interpret: did the condition change resource delivery or egg-laying opportunities, survival, or travel costs? Could the difference reflect your strategy or the model's assumptions?</p>
+          <p className="mt-4 text-sm text-amber-100">Interpret: did the condition change the resources gathered or reproductive output? Could the difference reflect your strategy or the model's assumptions?</p>
         </> : <p className="text-sm text-slate-300">No saved runs match these filters.</p>}
       </>}
     </section>

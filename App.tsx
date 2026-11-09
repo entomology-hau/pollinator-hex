@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { RunConfig, SpeciesStats, SpeciesType } from './types';
-import { SPECIES_DATA, MAX_DAYS, REPRESENTATIVE_SPECIES, BUMBLEBEE_POLLEN_PER_WORKER_MG, SOLITARY_POLLEN_PER_CELL_MG, EGGS_PER_OVIPOSITION } from './constants';
+import { SPECIES_DATA, MAX_DAYS, REPRESENTATIVE_SPECIES, BUMBLEBEE_POLLEN_PER_WORKER_MG, SOLITARY_POLLEN_PER_CELL_MG, HOVERFLY_RESOURCES_PER_EGG } from './constants';
 import { SpeciesCard } from './components/SpeciesCard';
 import { ScenarioSetup } from './components/ScenarioSetup';
 import { TrialHistory } from './components/TrialHistory';
@@ -8,7 +8,7 @@ import { HexGrid } from './components/HexGrid';
 import { HUD } from './components/HUD';
 import { EventLog } from './components/EventLog';
 import { TutorialModal } from './components/TutorialModal';
-import { createInitialState, startGame, move, forage, endDay, oviposit, getReproductiveScore } from './game/rules';
+import { createInitialState, startGame, move, forage, endDay, getReproductiveScore } from './game/rules';
 import { DEFAULT_CONFIG, normaliseConfig, SCENARIOS } from './game/scenarios';
 import { createTrialResult, loadTrials, saveTrials, resultsToCsv, eventsToCsv, MAX_SAVED_TRIALS } from './game/trials';
 import { RotateCcw, ShieldAlert, Trophy, BookOpen } from 'lucide-react';
@@ -52,7 +52,6 @@ export default function App() {
   const handleMove = (q: number, r: number) => { if (!showTutorial) setGameState(previous => move(previous, q, r)); };
   const handleForage = () => { if (!showTutorial) setGameState(forage); };
   const handleRest = () => { if (!showTutorial) setGameState(endDay); };
-  const handleOviposit = () => { if (!showTutorial) setGameState(oviposit); };
   const setup = (seed = config.seed) => { setConfig(previous => ({ ...previous, seed, trial: nextTrial() })); setGameState(createInitialState()); };
   const handleExit = () => {
     if (!showTutorial && window.confirm('Leave this unfinished trial? It will not be added to your completed trial history.')) setup();
@@ -76,7 +75,7 @@ export default function App() {
             <img src={`${import.meta.env.BASE_URL}branding/ento-logo-white.png`} alt="Applied Entomology at HAU" width="456" height="454" className="w-16 sm:w-20 h-auto" />
           </div>
           <h1 ref={screenTitle} tabIndex={-1} className="inline-block text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-amber-400 to-orange-600 mb-4">Pollinator</h1>
-          <p className="text-slate-200 text-lg">Gather food. Provision your nest or find aphids for your offspring. Discover how a changing landscape shapes reproductive success.</p>
+          <p className="text-slate-200 text-lg">Choose your species. Gather resources and support future offspring as you navigate a changing landscape.</p>
           <p className="text-sm text-slate-300 mt-3">A {MAX_DAYS}-day season with three pollinators and repeatable classroom experiments.</p>
         </header>
         <button onClick={() => setShowTutorial(true)} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-500 text-slate-100 px-6 py-3 rounded-full"><BookOpen className="w-5 h-5" aria-hidden="true" />How to Play / Field Guide</button>
@@ -100,22 +99,20 @@ export default function App() {
           <h1 ref={screenTitle} tabIndex={-1} className="text-3xl font-bold mb-2">{gameState.player.isAlive ? 'Season complete' : 'Your foraging season has ended'}</h1>
           <p className="text-slate-300">{gameState.player.deathReason ? `Cause of death: ${gameState.player.deathReason}` : `You survived all ${MAX_DAYS} days.`}</p>
           <p className="text-amber-200 mt-2">{species.name} · <i>{REPRESENTATIVE_SPECIES[species.name]}</i></p>
-          <p className="text-sm text-slate-300 my-4 break-words">Trial {gameState.config.trial} · {scenario.title} · {gameState.config.treatment === 'control' ? scenario.controlLabel : scenario.interventionLabel} · Seed {gameState.config.seed}</p>
+          <p className="text-sm text-slate-300 my-4 break-words">{scenario.title} · {gameState.config.treatment === 'control' ? `Control: ${scenario.controlLabel}` : `Treatment: ${scenario.interventionLabel}`} · Seed {gameState.config.seed}</p>
           <section className="bg-emerald-950/50 border border-emerald-800 rounded-xl p-5 mb-5" aria-labelledby="output-heading">
             <h2 id="output-heading" className="text-lg font-semibold text-emerald-200">Reproductive output</h2>
             <p className="text-6xl font-bold my-3">{output.score}</p>
             <p className="text-xl text-emerald-100">{output.label}</p>
-            <p className="text-sm text-slate-300 mt-3">{isHoverfly ? `${gameState.player.ovipositionBatches} oviposition ${gameState.player.ovipositionBatches === 1 ? 'bout' : 'bouts'} × ${EGGS_PER_OVIPOSITION} eggs.` : `${gameState.player.deliveredPollen} mg pollen-equivalent delivered; ${species.name === SpeciesType.BUMBLEBEE ? BUMBLEBEE_POLLEN_PER_WORKER_MG : SOLITARY_POLLEN_PER_CELL_MG} mg per ${species.name === SpeciesType.BUMBLEBEE ? 'worker supported' : 'nest cell'}.`}</p>
-            <p className="text-xs text-slate-300 mt-2">Fictionalised outcomes using research-informed quantities. {isHoverfly ? 'Egg counts represent reproductive investment; larval survival is not simulated.' : 'Bee outputs describe brood provision support, not adults emerging within these 15 days.'}</p>
+            <p className="text-sm text-slate-300 mt-3">{isHoverfly ? `${gameState.player.pollen} resource units gathered, including habitat bonuses; ${HOVERFLY_RESOURCES_PER_EGG} units support one potential egg.` : `${gameState.player.pollen} mg pollen-equivalent gathered; ${species.name === SpeciesType.BUMBLEBEE ? BUMBLEBEE_POLLEN_PER_WORKER_MG : SOLITARY_POLLEN_PER_CELL_MG} mg per ${species.name === SpeciesType.BUMBLEBEE ? 'worker supported' : 'nest cell'}.`}</p>
+            <p className="text-xs text-slate-300 mt-2">Resources translate automatically into fictional reproductive output. Development and offspring survival are not simulated.</p>
           </section>
-          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5 text-sm">
+          <p className="rounded-lg bg-amber-950/30 p-3 text-amber-100 mb-5">For the class graph: {species.name} · {gameState.config.treatment === 'control' ? 'Control' : 'Treatment'} · <strong>{output.score} {output.label.toLowerCase()}</strong></p>
+          <dl className="grid grid-cols-3 gap-3 mb-5 text-sm">
             {[
-              ['Days completed', gameState.metrics.completedDays], ['Day reached', gameState.day], ['Distance (hexes)', gameState.metrics.distance],
-              [isHoverfly ? 'Floral reserve left' : 'Pollen still carried (mg equiv.)', isHoverfly ? gameState.player.floralReserve : gameState.player.carriedPollen],
-              ['Energy left', gameState.player.energy.toFixed(1)], ['Toxicity / limit', `${gameState.player.toxicity.toFixed(1)} / ${species.maxToxicity}`], ['Foraging visits', gameState.metrics.forageVisits], ['Exposure events', gameState.metrics.exposureEvents],
+              ['Resources gathered', gameState.player.pollen], ['Days completed', gameState.metrics.completedDays], ['Distance (hexes)', gameState.metrics.distance],
             ].map(([label, value]) => <div key={label} className="bg-slate-800 p-3 rounded-lg"><dt className="text-slate-300">{label}</dt><dd className="font-mono text-xl mt-1 text-amber-200">{value}</dd></div>)}
           </dl>
-          {!isHoverfly && gameState.player.carriedPollen > 0 && <p className="text-sm text-slate-300 mb-4">Undelivered pollen does not count towards brood provisioning.</p>}
           <p className="text-sm text-amber-100 mb-4">Interpret: {scenario.question} Which differences reflect your choices, and which reflect the landscape?</p>
           <EventLog logs={gameState.player.history} />
           <p role="status" className="text-xs text-slate-300 mt-4">{savedCurrentRun ? 'This finished trial has been added to the history below.' : 'Recording this trial…'}</p>
@@ -133,14 +130,14 @@ export default function App() {
       <main className="min-h-screen bg-slate-950 p-3 sm:p-5">
         <header className="max-w-[1440px] mx-auto mb-4 space-y-2">
           <h1 ref={screenTitle} tabIndex={-1} className="text-2xl font-bold text-amber-300">Pollinator Hex</h1>
-          <p className="text-sm text-slate-200 break-words">Trial {gameState.config.trial} · {SCENARIOS[gameState.config.scenarioId].title} · {gameState.config.treatment === 'control' ? SCENARIOS[gameState.config.scenarioId].controlLabel : SCENARIOS[gameState.config.scenarioId].interventionLabel} · Seed <span className="font-mono">{gameState.config.seed}</span></p>
+          <p className="text-sm text-slate-200 break-words">{SCENARIOS[gameState.config.scenarioId].title} · {gameState.config.treatment === 'control' ? `Control: ${SCENARIOS[gameState.config.scenarioId].controlLabel}` : `Treatment: ${SCENARIOS[gameState.config.scenarioId].interventionLabel}`} · Seed <span className="font-mono">{gameState.config.seed}</span></p>
         </header>
         <div className="max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
           <section aria-label="Landscape and movement" className="min-w-0"><HexGrid gameState={gameState} onHexClick={handleMove} />
             <p className="rounded-lg border border-slate-700 bg-slate-900 p-4 mt-3 text-sm text-slate-300">Your experiment: {SCENARIOS[gameState.config.scenarioId].question}</p>
           </section>
           <aside aria-label="Pollinator status and actions" className="min-w-0 space-y-4">
-            <HUD gameState={gameState} currentHex={gameState.map.get(`${gameState.player.q},${gameState.player.r}`)} onForage={handleForage} onRest={handleRest} onOviposit={handleOviposit} onOpenHelp={() => setShowTutorial(true)} onExit={handleExit} />
+            <HUD gameState={gameState} currentHex={gameState.map.get(`${gameState.player.q},${gameState.player.r}`)} onForage={handleForage} onRest={handleRest} onOpenHelp={() => setShowTutorial(true)} onExit={handleExit} />
             <EventLog logs={gameState.player.history} />
           </aside>
         </div>
