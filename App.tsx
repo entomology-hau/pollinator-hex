@@ -70,7 +70,12 @@ export default function App() {
     {gameState.status === 'MENU' ? (
       <main className="min-h-screen flex flex-col items-center px-4 py-8 sm:p-8 bg-slate-900 text-center gap-6">
         <header className="max-w-3xl">
-          <h1 ref={screenTitle} tabIndex={-1} className="text-4xl sm:text-5xl font-bold text-amber-400 mb-4">Pollinator Hex</h1>
+          <div className="flex items-center justify-center gap-5 sm:gap-7 mb-6" aria-label="Harper Adams University and Applied Entomology">
+            <img src={`${import.meta.env.BASE_URL}branding/harper-adams-logo.png`} alt="Harper Adams University" width="773" height="252" className="w-44 sm:w-52 h-auto" />
+            <span className="h-12 w-px bg-white/25" aria-hidden="true" />
+            <img src={`${import.meta.env.BASE_URL}branding/ento-logo-white.png`} alt="Applied Entomology at HAU" width="456" height="454" className="w-16 sm:w-20 h-auto" />
+          </div>
+          <h1 ref={screenTitle} tabIndex={-1} className="inline-block text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-amber-400 to-orange-600 mb-4">Pollinator</h1>
           <p className="text-slate-200 text-lg">Gather food. Provision your nest or find aphids for your offspring. Discover how a changing landscape shapes reproductive success.</p>
           <p className="text-sm text-slate-300 mt-3">A {MAX_DAYS}-day season with three pollinators and repeatable classroom experiments.</p>
         </header>

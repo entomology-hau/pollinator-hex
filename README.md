@@ -81,6 +81,8 @@ Research behind the teaching model:
 
 ## Development
 
+The landing-page logos are the existing white Harper Adams University and Applied Entomology assets from [EntoHub](https://github.com/entomology-hau/entohub/tree/main/site/assets), bundled locally in `public/branding`. Species icons are simplified original SVG illustrations, with distinct bumblebee, red mason bee and marmalade hoverfly shapes. Identification references include [BWARS: *Bombus terrestris*](https://bwars.com/bee/apidae/bombus-terrestris), [BWARS: *Osmia bicornis*](https://bwars.com/content/beginners-bees-wasps-osmia-bicornis-red-mason-bee) and the [National Biodiversity Data Centre hoverfly guide](https://biodiversityireland.ie/app/uploads/2015/03/Simple-guide-to-4-Irish-hoverfly-species2.pdf).
+
 Requires Node.js 22 or later and npm.
 
 ```sh
