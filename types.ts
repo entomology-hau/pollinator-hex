@@ -24,6 +24,7 @@ export interface GameState {
   species: SpeciesStats | null; config: RunConfig; weatherSchedule: Weather[];
   riskVisits: Record<string, number>; metrics: RunMetrics;
   player: {
+    /** Pollen stores raw gathered/credited resource units, before reproductive scaling. */
     energy: number; pollen: number; toxicity: number;
     q: number; r: number; isAlive: boolean; deathReason?: string;
     history: { day: number; event: string }[];
@@ -33,6 +34,7 @@ export interface GameState {
 export interface TrialResult {
   id: string; modelVersion: string; finishedAt: string; config: RunConfig; species: SpeciesType;
   survived: boolean; dayReached: number; completedDays: number; causeOfDeath: string;
+  /** Snapshot display quantity: mg pollen-equivalent for bees, resource units for hoverflies. Never rescale saved values. */
   resourcesCollected: number; score: number; scoreLabel: string;
   /** Retained only when reading saved results from the previous model. */
   carriedPollen?: number; deliveredPollen?: number; floralReserve?: number; ovipositionBatches?: number;

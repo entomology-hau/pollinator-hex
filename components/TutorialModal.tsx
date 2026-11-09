@@ -1,9 +1,9 @@
 import React, { useEffect, useId, useRef } from 'react';
 import { X, Battery, Skull, Flower, Sun, Target, BookOpen } from 'lucide-react';
 import {
-  BUMBLEBEE_POLLEN_PER_WORKER_MG, ENERGY_PER_RESOURCE, HOVERFLY_APHID_BONUS_MULTIPLIER,
-  HOVERFLY_RESOURCES_PER_EGG, MAX_DAYS, MODEL_VERSION, POLLEN_MG_PER_UNIT,
-  SOLITARY_POLLEN_PER_CELL_MG, RESOURCE_REGEN_DAYS, CROP_ENERGY_BONUS,
+  BUMBLEBEE_POLLEN_PER_WORKER_MG, HOVERFLY_APHID_BONUS_MULTIPLIER,
+  HOVERFLY_RESOURCES_PER_EGG, MAX_DAYS, MODEL_VERSION,
+  SOLITARY_POLLEN_PER_CELL_MG, RESOURCE_REGEN_DAYS,
   SHELTER_REST_RECOVERY, OPEN_REST_RECOVERY
 } from '../constants';
 
@@ -94,9 +94,10 @@ export const TutorialModal: React.FC<Props> = ({ isOpen, onClose }) => {
               </table>
             </div>
             <p>
-              Each bee resource unit represents {POLLEN_MG_PER_UNIT} mg pollen-equivalent. Outputs count whole
-              workers, cells or eggs, rounding down. Resources already gathered remain part of your result
-              if the season ends early.
+              Bumblebee gathering represents colony resource allocation; solitary bee gathering represents
+              one nesting female. Game actions compress real foraging, with fictional scaling for each species.
+              Outputs count whole workers, cells or eggs, rounding down. Resources already gathered remain
+              part of your result if the season ends early.
             </p>
             <p>
               <strong className="text-cyan-200">Hoverfly habitat bonus:</strong> forage on flowers with aphids on the same
@@ -111,9 +112,9 @@ export const TutorialModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <Battery className="h-5 w-5 text-emerald-300" aria-hidden="true" /> Energy and shelter
             </h3>
             <p>
-              Energy is your activity budget. Flying uses it; foraging returns {ENERGY_PER_RESOURCE} energy per harvested unit,
-              with {CROP_ENERGY_BONUS} extra on flowering crops, minus the action cost. The Forage preview shows the net change,
-              which can be a small cost. At zero energy the run ends through exhaustion.
+              Energy is your activity budget. Flying uses it; feeding during foraging can replenish it,
+              particularly on flowering crops. The Forage preview shows the net change after the action cost,
+              which can be a small loss. At zero energy the run ends through exhaustion.
             </p>
             <p>
               Bees shelter at the central nest. Hoverflies can also shelter in woodland and urban gardens.
@@ -166,10 +167,10 @@ export const TutorialModal: React.FC<Props> = ({ isOpen, onClose }) => {
           <section className="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
             <h3 className="mb-2 font-bold text-white">Keyboard controls</h3>
             <p>
-              Tab into the map. <strong>W/S</strong> explores up/down, <strong>Q/A</strong> upper/lower left and
+              Tab through the action buttons into the map. <strong>W/S</strong> explores up/down, <strong>Q/A</strong> upper/lower left and
               <strong> E/D</strong> upper/lower right. Arrow keys also move focus; <strong>Home</strong> selects
               your position. <strong>Enter</strong> or <strong>Space</strong> flies to the focused hex.
-              Tab reaches the action buttons. <strong>Escape</strong> closes this guide.
+              <strong>Shift+Tab</strong> returns to the action buttons. <strong>Escape</strong> closes this guide.
             </p>
           </section>
 

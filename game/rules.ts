@@ -1,6 +1,6 @@
 import {
-  BUMBLEBEE_POLLEN_PER_WORKER_MG, CROP_ENERGY_BONUS, ENERGY_PER_RESOURCE, HOVERFLY_APHID_BONUS_MULTIPLIER, HOVERFLY_RESOURCES_PER_EGG,
-  MAX_DAYS, OPEN_REST_RECOVERY, POLLEN_MG_PER_UNIT, RESOURCE_REGEN_DAYS, SHELTER_REST_RECOVERY, SOLITARY_POLLEN_PER_CELL_MG, START_ENERGY, WEATHER_EFFECTS
+  BUMBLEBEE_POLLEN_MG_PER_UNIT, BUMBLEBEE_POLLEN_PER_WORKER_MG, CROP_ENERGY_BONUS, ENERGY_PER_RESOURCE, HOVERFLY_APHID_BONUS_MULTIPLIER, HOVERFLY_RESOURCES_PER_EGG,
+  MAX_DAYS, OPEN_REST_RECOVERY, RESOURCE_REGEN_DAYS, SHELTER_REST_RECOVERY, SOLITARY_POLLEN_MG_PER_UNIT, SOLITARY_POLLEN_PER_CELL_MG, START_ENERGY, WEATHER_EFFECTS
 } from '../constants';
 import { GameState, HexCell, RunConfig, SpeciesStats, SpeciesType, TerrainType, Weather } from '../types';
 import { createScenario, DEFAULT_CONFIG, normaliseConfig } from './scenarios';
@@ -220,7 +220,7 @@ export const forage = (state: GameState): GameState => {
       pollen: state.player.pollen + credited,
       toxicity: state.player.toxicity + exposure }
   };
-  const resource = isHoverfly(state) ? `${amount} floral resource units` : `${amount * POLLEN_MG_PER_UNIT} mg pollen-equivalent`;
+  const resource = isHoverfly(state) ? `${amount} floral resource units` : `${getResourceQuantity(species.name, amount)} mg pollen-equivalent`;
   const bonusNote = credited > amount ? ` Nearby aphids add ${credited - amount} reproductive resource units: prey for future larvae, not food for the adult.` : '';
   const energyNote = ` Energy ${preview.energyChange >= 0 ? '+' : ''}${preview.energyChange.toFixed(1)} after feeding and foraging costs (now ${preview.energyAfter.toFixed(1)}/${species.maxEnergy}).`;
   return finishIfDead(log(next, `Foraged ${resource}.${bonusNote}${energyNote}${impaired ? ' Yield reduced by toxicity.' : ''}${exposure > 0 ? ` Exposure: +${exposure.toFixed(1)} toxicity.` : ''}`));
@@ -262,10 +262,16 @@ export const endDay = (state: GameState, rng?: RandomSource): GameState => {
   return log(next, `${next.weather.charAt(0) + next.weather.slice(1).toLowerCase()} weather. Plan your next foraging trip and rest before energy runs out.`);
 };
 
+/** Display/reproductive quantity only: energy and harvesting retain their raw units. */
+export const getResourceQuantity = (species: SpeciesType, rawUnits: number): number => rawUnits * (
+  species === SpeciesType.BUMBLEBEE ? BUMBLEBEE_POLLEN_MG_PER_UNIT
+    : species === SpeciesType.SOLITARY_BEE ? SOLITARY_POLLEN_MG_PER_UNIT : 1
+);
+
 /** Fictional game outputs informed by representative pollen requirements, not demographic predictions. */
 export const getReproductiveScore = (state: GameState): { score: number; label: string } => {
   if (isHoverfly(state)) return { score: Math.floor(state.player.pollen / HOVERFLY_RESOURCES_PER_EGG), label: 'Eggs supported' };
-  const pollenMg = state.player.pollen * POLLEN_MG_PER_UNIT;
+  const pollenMg = getResourceQuantity(state.species?.name ?? SpeciesType.BUMBLEBEE, state.player.pollen);
   return state.species?.name === SpeciesType.SOLITARY_BEE
     ? { score: Math.floor(pollenMg / SOLITARY_POLLEN_PER_CELL_MG), label: 'Nest cells provisioned' }
     : { score: Math.floor(pollenMg / BUMBLEBEE_POLLEN_PER_WORKER_MG), label: 'Workers supported' };

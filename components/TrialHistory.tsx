@@ -74,7 +74,7 @@ export const TrialHistory: React.FC<Props> = ({ results, onReplay, onExportSumma
                 <td className="px-3 py-3 max-w-40 break-words font-mono text-xs">{result.config.seed}</td>
                 <td className="px-3 py-3">{result.survived ? 'Season survived' : `Died on day ${result.dayReached}`}<span className="block text-xs text-slate-300">{result.causeOfDeath || `${result.completedDays} days completed`}</span></td>
                 <td className="px-3 py-3">{result.score}<span className="block text-xs text-slate-300">{result.scoreLabel}</span></td>
-                <td className="px-3 py-3">{result.resourcesCollected}<span className="block text-xs text-slate-300">{result.species === SpeciesType.HOVERFLY ? 'resource units' : 'mg pollen-equivalent'}</span></td>
+                <td className="px-3 py-3">{result.resourcesCollected.toLocaleString('en-GB', { maximumFractionDigits: 2 })}<span className="block text-xs text-slate-300">{result.species === SpeciesType.HOVERFLY ? 'resource units' : 'mg pollen-equivalent'}</span></td>
                 <td className="px-3 py-3"><button type="button" onClick={() => onReplay({ ...result.config }, result.species)} className="whitespace-nowrap rounded-lg border border-slate-500 px-3 py-2 hover:bg-slate-800" aria-label={`Repeat ${result.species}, ${result.config.treatment === 'control' ? 'control' : 'treatment'}, seed ${result.config.seed}`}>Repeat setup</button></td>
               </tr>)}</tbody>
             </table>

@@ -1,6 +1,6 @@
 import * as constants from '../constants';
 import { GameState, RunConfig, RunMetrics, SpeciesType, TrialResult, Weather } from '../types';
-import { getReproductiveScore, ROAD_COLLISION_CHANCE, ROAD_COLLISION_ENERGY_LOSS } from './rules';
+import { getReproductiveScore, getResourceQuantity, ROAD_COLLISION_CHANCE, ROAD_COLLISION_ENERGY_LOSS } from './rules';
 import { SCENARIOS } from './scenarios';
 
 export const TRIAL_STORAGE_KEY = 'pollinator-hex-trials';
@@ -20,13 +20,18 @@ export const createTrialResult = (state: GameState, finishedAt = new Date().toIS
     id, modelVersion: constants.MODEL_VERSION, finishedAt,
     config: { ...state.config }, species: state.species.name,
     survived: state.player.isAlive, dayReached: state.day, completedDays: state.metrics.completedDays,
-    causeOfDeath: state.player.deathReason ?? '', resourcesCollected: state.player.pollen,
+    causeOfDeath: state.player.deathReason ?? '', resourcesCollected: getResourceQuantity(state.species.name, state.player.pollen),
     score: outcome.score, scoreLabel: outcome.label, energyRemaining: state.player.energy,
     toxicity: state.player.toxicity, metrics: { ...state.metrics },
     settings: JSON.stringify({
       constants, species: state.species, scenario: SCENARIOS[state.config.scenarioId], config: state.config,
       roadCollisionChance: ROAD_COLLISION_CHANCE, roadCollisionEnergyLoss: ROAD_COLLISION_ENERGY_LOSS,
       unshelteredNightPredationChance: 0.15,
+      resourceAccounting: {
+        rawResourceUnits: state.player.pollen,
+        pollenMgPerUnit: state.species.name === SpeciesType.HOVERFLY ? null : getResourceQuantity(state.species.name, 1),
+        resourceUnit: state.species.name === SpeciesType.HOVERFLY ? 'resource units' : 'mg pollen-equivalent',
+      },
       outputMeaning: 'Fictional reproductive output derived from model resources; not a prediction of field reproduction.',
     }),
     weatherSchedule: [...state.weatherSchedule], history: state.player.history.map(entry => ({ ...entry })),

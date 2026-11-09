@@ -71,11 +71,11 @@ export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
   }).length ?? 0;
   const hasUnknownRoute = selectedPreview?.path.some(({ q, r }) => !map.get(keyOf(q, r))?.isRevealed) ?? false;
 
-  const describeCell = (cell: HexCell) => {
+  const describeCell = (cell: HexCell, index: number) => {
     const here = keyOf(cell.q, cell.r) === playerKey;
     const preview = getMovePreview(gameState, cell.q, cell.r);
     const terrain = cell.isRevealed ? terrainLabel(cell) : 'Unexplored terrain';
-    const parts = [`Hex ${cell.q}, ${cell.r}`, terrain];
+    const parts = [`Hex ${index + 1}`, terrain];
     if (cell.isRevealed && hasFlowers(cell)) {
       const depleted = cell.lastForagedDay !== null && day - cell.lastForagedDay < RESOURCE_REGEN_DAYS;
       parts.push(depleted ? 'Flowers depleted' : 'Flowers available');
@@ -152,7 +152,7 @@ export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
         aria-describedby="map-keyboard-help"
         data-testid="hex-map"
       >
-        {cells.map(cell => {
+        {cells.map((cell, index) => {
           const key = keyOf(cell.q, cell.r);
           const x = HEX_SIZE * 1.5 * cell.q;
           const y = HEX_SIZE * Math.sqrt(3) * (cell.r + cell.q / 2);
@@ -169,7 +169,7 @@ export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
               transform={`translate(${x},${y})`}
               role="button"
               tabIndex={key === tabStop ? 0 : -1}
-              aria-label={describeCell(cell)}
+              aria-label={describeCell(cell, index)}
               aria-disabled={!preview.valid}
               aria-current={isPlayer ? 'location' : undefined}
               data-coordinate={key}
@@ -253,7 +253,6 @@ export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
         {selectedCell && selectedPreview && <>
           <p className="font-semibold text-slate-100">
             {selectedCell.isRevealed ? terrainLabel(selectedCell) : 'Unexplored terrain'}
-            <span className="ml-2 font-normal text-slate-300">({selectedCell.q}, {selectedCell.r})</span>
           </p>
           {selectedCell.isRevealed && <p className="mt-1 text-xs text-slate-300">{hasFlowers(selectedCell) ? `Flower quality: ${selectedCell.resourceQuality}%.` : 'No floral resources.'}{selectedCell.aphids ? ' Aphid habitat: nearby flowers give hoverflies a resource bonus.' : ''}{selectedCell.pesticideLevel > 0 ? ` Exposure level: ${(selectedCell.pesticideLevel * 100).toFixed(0)}%.` : ' No pesticide exposure.'}</p>}
           {keyOf(selectedCell.q, selectedCell.r) === playerKey ? (

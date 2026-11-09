@@ -6,7 +6,7 @@ import { GameState, HexCell, SpeciesType, TerrainType, Weather } from '../types'
 import {
   canForage, createInitialState, createMap, endDay, estimateMoveCost, forage,
   getForageBlockReason, getMovePreview, hexDistance, move, startGame, traceHexPath,
-  getReproductiveScore, hasNearbyAphids, isSafeShelter, getForagePreview, getRestPreview, ROAD_COLLISION_ENERGY_LOSS
+  getReproductiveScore, getResourceQuantity, hasNearbyAphids, isSafeShelter, getForagePreview, getRestPreview, ROAD_COLLISION_ENERGY_LOSS
 } from '../game/rules';
 
 const tile = (q: number, r: number, type = TerrainType.MEADOW, overrides: Partial<HexCell> = {}): HexCell => ({
@@ -331,20 +331,20 @@ test('a surviving final-day rest restores energy before completing day 15', () =
 });
 
 test('bees gain reproductive output from foraging immediately without a nest delivery', () => {
-  for (const [species, gathered, harvest] of [
-    [SpeciesType.BUMBLEBEE, 48, 12],
-    [SpeciesType.SOLITARY_BEE, 56, 9],
+  for (const [species, gathered, harvest, output] of [
+    [SpeciesType.BUMBLEBEE, 0, 12, 3],
+    [SpeciesType.SOLITARY_BEE, 43, 9, 1],
   ] as const) {
     const state = scenario([tile(0, 0), tile(1, 0, TerrainType.NEST)], species);
     state.player.pollen = gathered;
     assert.equal(getReproductiveScore(state).score, 0);
     const fed = forage(state);
     assert.equal(fed.player.pollen, gathered + harvest);
-    assert.equal(getReproductiveScore(fed).score, 1);
+    assert.equal(getReproductiveScore(fed).score, output);
     assert.equal(state.player.pollen, gathered, 'foraging must not mutate prior state');
     const home = move(fed, 1, 0, safe);
     assert.equal(home.player.pollen, fed.player.pollen);
-    assert.equal(getReproductiveScore(home).score, 1, 'nest arrival does not add or unlock resources');
+    assert.equal(getReproductiveScore(home).score, output, 'nest arrival does not add or unlock resources');
   }
 });
 
@@ -509,20 +509,49 @@ test('weather schedule is independent of actions, species and treatment', () => 
 });
 
 
-test('reproductive outputs convert cumulative resource totals at each species threshold', () => {
-  const bumblebee = scenario([tile(0, 0, TerrainType.NEST)]);
-  bumblebee.player.pollen = 119;
-  assert.deepEqual(getReproductiveScore(bumblebee), { score: 1, label: 'Workers supported' });
-  bumblebee.player.pollen = 120;
-  assert.equal(getReproductiveScore(bumblebee).score, 2);
-  const solitary = scenario([tile(0, 0, TerrainType.NEST)], SpeciesType.SOLITARY_BEE);
-  solitary.player.pollen = 129;
-  assert.deepEqual(getReproductiveScore(solitary), { score: 1, label: 'Nest cells provisioned' });
-  solitary.player.pollen = 130;
-  assert.equal(getReproductiveScore(solitary).score, 2);
-  const fly = scenario([tile(0, 0)], SpeciesType.HOVERFLY);
-  fly.player.pollen = 8;
-  assert.deepEqual(getReproductiveScore(fly), { score: 2, label: 'Eggs supported' });
-  fly.player.pollen = 9;
-  assert.equal(getReproductiveScore(fly).score, 3);
+test('reproductive outputs count whole offspring at each scaled species threshold', () => {
+  for (const [species, unitsPerOffspring, label] of [
+    [SpeciesType.BUMBLEBEE, 4, 'Workers supported'],
+    [SpeciesType.SOLITARY_BEE, 52, 'Nest cells provisioned'],
+    [SpeciesType.HOVERFLY, 3, 'Eggs supported'],
+  ] as const) {
+    const state = scenario([tile(0, 0, TerrainType.NEST)], species);
+    for (const [rawUnits, score] of [[unitsPerOffspring - 1, 0], [unitsPerOffspring, 1], [2 * unitsPerOffspring - 1, 1], [2 * unitsPerOffspring, 2]]) {
+      state.player.pollen = rawUnits;
+      assert.deepEqual(getReproductiveScore(state), { score, label });
+    }
+  }
+});
+
+test('strong-season resource totals support approximately 300 workers and 30 nest cells', () => {
+  for (const [species, rawUnits, pollenMg, offspring] of [
+    [SpeciesType.BUMBLEBEE, 1227, 18405, 306],
+    [SpeciesType.SOLITARY_BEE, 1605, 2006.25, 30],
+  ] as const) {
+    const state = scenario([tile(0, 0, TerrainType.NEST)], species);
+    state.player.pollen = rawUnits;
+    assert.equal(getResourceQuantity(species, rawUnits), pollenMg);
+    assert.equal(getReproductiveScore(state).score, offspring);
+    assert.equal(state.player.pollen, rawUnits, 'reproductive conversion does not alter gathered resources');
+  }
+});
+
+test('reproductive scaling changes displayed pollen without changing forage or food energy', () => {
+  for (const [species, rawHarvest, displayQuantity, energyAfter, resourceDescription] of [
+    [SpeciesType.BUMBLEBEE, 12, 180, 51, '180 mg pollen-equivalent'],
+    [SpeciesType.SOLITARY_BEE, 9, 11.25, 51.5, '11.25 mg pollen-equivalent'],
+    [SpeciesType.HOVERFLY, 6, 6, 49, '6 floral resource units'],
+  ] as const) {
+    const state = scenario([tile(0, 0)], species);
+    state.player.energy = 50;
+    const preview = getForagePreview(state)!;
+    assert.equal(preview.harvest, rawHarvest);
+    assert.equal(preview.creditedResources, rawHarvest);
+    assert.equal(preview.foodEnergy, rawHarvest * 0.5);
+    const fed = forage(state);
+    assert.equal(fed.player.pollen, rawHarvest);
+    assert.equal(getResourceQuantity(species, fed.player.pollen), displayQuantity);
+    assert.equal(fed.player.energy, energyAfter);
+    assert.ok(fed.player.history.at(-1)!.event.startsWith(`Foraged ${resourceDescription}.`));
+  }
 });

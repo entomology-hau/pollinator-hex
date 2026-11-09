@@ -46,7 +46,7 @@ test('finished snapshots retain independent settings, metrics and action history
   state.player.history = [{ day: 4, event: 'Simulation ended.' }];
   state.weatherSchedule = [Weather.SUNNY];
   const saved = createTrialResult(state, '2026-11-09T12:00:00.000Z', 'fixed-id');
-  assert.equal(saved.id, 'fixed-id'); assert.equal(saved.resourcesCollected, 124); assert.equal(saved.score, 2);
+  assert.equal(saved.id, 'fixed-id'); assert.equal(saved.resourcesCollected, 1860); assert.equal(saved.score, 31);
   assert.equal(Object.prototype.hasOwnProperty.call(saved, 'deliveredPollen'), false); assert.equal(Object.prototype.hasOwnProperty.call(saved, 'floralReserve'), false);
   assert.equal(saved.completedDays, 3); assert.equal(saved.modelVersion, MODEL_VERSION);
   assert.ok(isTrialResult(saved));
@@ -54,10 +54,59 @@ test('finished snapshots retain independent settings, metrics and action history
   assert.equal(settings.species.name, SpeciesType.BUMBLEBEE);
   assert.equal(settings.config.seed, state.config.seed);
   assert.equal(settings.constants.MODEL_VERSION, MODEL_VERSION);
+  assert.deepEqual(settings.resourceAccounting, { rawResourceUnits: 124, pollenMgPerUnit: 15, resourceUnit: 'mg pollen-equivalent' });
   state.config.seed = 'changed'; state.metrics.distance = 99; state.player.history[0].event = 'Changed'; state.weatherSchedule[0] = Weather.RAINY;
   assert.notEqual(saved.config.seed, state.config.seed); assert.notEqual(saved.metrics.distance, 99);
   assert.equal(saved.history[0].event, 'Simulation ended.'); assert.equal(saved.weatherSchedule[0], Weather.SUNNY);
   assert.throws(() => createTrialResult(createInitialState()), /finished/);
+});
+
+test('scaled resource quantities and fractional pollen-equivalents survive saving and CSV export', () => {
+  for (const [species, rawUnits, displayedResources, score, factor, unit] of [
+    [SpeciesType.BUMBLEBEE, 5, 75, 1, 15, 'mg pollen-equivalent'],
+    [SpeciesType.SOLITARY_BEE, 53, 66.25, 1, 1.25, 'mg pollen-equivalent'],
+    [SpeciesType.HOVERFLY, 7, 7, 2, null, 'resource units'],
+  ] as const) {
+    const state = createInitialState();
+    state.status = 'GAME_OVER'; state.species = SPECIES_DATA[species];
+    state.player.pollen = rawUnits; state.weatherSchedule = [Weather.SUNNY];
+    const saved = createTrialResult(state, '2026-11-09T12:00:00.000Z', species);
+    assert.equal(saved.resourcesCollected, displayedResources);
+    assert.equal(saved.score, score);
+    assert.equal(state.player.pollen, rawUnits);
+    assert.deepEqual(JSON.parse(saved.settings).resourceAccounting, {
+      rawResourceUnits: rawUnits, pollenMgPerUnit: factor, resourceUnit: unit,
+    });
+    const storage = memory();
+    assert.deepEqual(saveTrials([saved], storage), { error: null });
+    assert.deepEqual(loadTrials(storage).results, [saved]);
+    const rows = parseCsv(resultsToCsv([saved]));
+    const values = Object.fromEntries(rows[0].map((header, index) => [header, rows[1][index]]));
+    assert.equal(values.resources_collected, String(displayedResources));
+    assert.equal(values.resource_unit, unit);
+    assert.equal(values.reproductive_output, String(score));
+  }
+});
+
+test('pre-scaling snapshots retain their quantities and remain separate from model 3.3', () => {
+  const old = result({ id: 'before-scaling', modelVersion: '3.2', resourcesCollected: 124, score: 2 });
+  const state = createInitialState();
+  state.status = 'GAME_OVER'; state.species = SPECIES_DATA[SpeciesType.BUMBLEBEE];
+  state.player.pollen = 124; state.weatherSchedule = [Weather.SUNNY];
+  const current = createTrialResult(state, '2026-11-09T12:00:00.000Z', 'after-scaling');
+  const storage = memory(JSON.stringify({ version: TRIAL_STORAGE_VERSION, results: [old] }));
+  const loaded = loadTrials(storage);
+  assert.deepEqual(loaded.results, [old]);
+  assert.deepEqual(saveTrials([...loaded.results, current], storage), { error: null });
+  assert.deepEqual(loadTrials(storage).results, [old, current]);
+  const rows = parseCsv(resultsToCsv(loadTrials(storage).results));
+  const resourcesColumn = rows[0].indexOf('resources_collected');
+  const scoreColumn = rows[0].indexOf('reproductive_output');
+  assert.deepEqual(rows.slice(1).map(row => [row[resourcesColumn], row[scoreColumn]]), [['124', '2'], ['1860', '31']]);
+  const groups = compareTrials([old, current]);
+  assert.equal(groups.length, 2);
+  assert.equal(groups.find(group => group.modelVersion === '3.2')!.control.meanScore, 2);
+  assert.equal(groups.find(group => group.modelVersion === MODEL_VERSION)!.control.meanScore, 31);
 });
 
 test('summary CSV exactly preserves data, Unicode and embedded JSON', () => {
