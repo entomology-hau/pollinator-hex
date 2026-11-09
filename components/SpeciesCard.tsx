@@ -24,7 +24,7 @@ export const SpeciesCard: React.FC<Props> = ({ species, onSelect }) => {
         </div>
       </div>
       
-      <p className="text-slate-400 text-sm mb-6 h-12">{species.description}</p>
+      <p className="text-slate-400 text-sm mb-6 min-h-16">{species.description}</p>
       
       <div className="space-y-3 w-full">
         <div className="flex items-center justify-between text-sm">
@@ -32,7 +32,7 @@ export const SpeciesCard: React.FC<Props> = ({ species, onSelect }) => {
           <span className="font-mono text-amber-200">{species.maxEnergy}</span>
         </div>
         <div className="flex items-center justify-between text-sm">
-          <span className="flex items-center gap-2 text-slate-300"><Zap className="w-4 h-4" /> Flight Cost</span>
+          <span className="flex items-center gap-2 text-slate-300"><Zap className="w-4 h-4" /> Flight Cost / Hex</span>
           <span className="font-mono text-amber-200">{species.energyCostMove}</span>
         </div>
         <div className="flex items-center justify-between text-sm">
@@ -40,7 +40,7 @@ export const SpeciesCard: React.FC<Props> = ({ species, onSelect }) => {
           <span className="font-mono text-amber-200">{species.flightRange} hexes</span>
         </div>
         <div className="flex items-center justify-between text-sm">
-          <span className="flex items-center gap-2 text-slate-300"><Skull className="w-4 h-4" /> Max Toxicity</span>
+          <span className="flex items-center gap-2 text-slate-300"><Skull className="w-4 h-4" /> Toxicity Limit</span>
           <span className="font-mono text-amber-200">{species.maxToxicity}</span>
         </div>
       </div>

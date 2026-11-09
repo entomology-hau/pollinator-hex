@@ -1,551 +1,106 @@
-import React, { useState } from 'react';
-import { GameState, HexCell, TerrainType, Weather, SpeciesStats, SpeciesType } from './types';
-import { SPECIES_DATA, MAP_RADIUS, MAX_DAYS, START_ENERGY, WEATHER_EFFECTS } from './constants';
+import React, { useEffect, useRef, useState } from 'react';
+import { SpeciesStats, SpeciesType } from './types';
+import { SPECIES_DATA, MAX_DAYS } from './constants';
 import { SpeciesCard } from './components/SpeciesCard';
 import { HexGrid } from './components/HexGrid';
 import { HUD } from './components/HUD';
 import { EventLog } from './components/EventLog';
 import { TutorialModal } from './components/TutorialModal';
-import { RotateCcw, ShieldAlert, Trophy, Baby, BookOpen } from 'lucide-react';
-
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-const cubeRound = (cube: { x: number, y: number, z: number }) => {
-    let rx = Math.round(cube.x);
-    let ry = Math.round(cube.y);
-    let rz = Math.round(cube.z);
-
-    const x_diff = Math.abs(rx - cube.x);
-    const y_diff = Math.abs(ry - cube.y);
-    const z_diff = Math.abs(rz - cube.z);
-
-    if (x_diff > y_diff && x_diff > z_diff) {
-        rx = -ry - rz;
-    } else if (y_diff > z_diff) {
-        ry = -rx - rz;
-    } else {
-        rz = -rx - ry;
-    }
-    return { q: rx, r: ry };
-};
-
-const createMap = (): Map<string, HexCell> => {
-  const map = new Map<string, HexCell>();
-  
-  for (let q = -MAP_RADIUS; q <= MAP_RADIUS; q++) {
-    const r1 = Math.max(-MAP_RADIUS, -q - MAP_RADIUS);
-    const r2 = Math.min(MAP_RADIUS, -q + MAP_RADIUS);
-    for (let r = r1; r <= r2; r++) {
-      let type = TerrainType.MEADOW;
-      const rand = Math.random();
-      
-      if (q === 0 && r === 0) type = TerrainType.NEST;
-      else if (rand > 0.95) type = TerrainType.WATER;
-      else if (rand > 0.80) type = TerrainType.FOREST;
-      else if (rand > 0.65) type = TerrainType.URBAN;
-      else if (rand > 0.45) type = TerrainType.CROP;
-
-      map.set(`${q},${r}`, {
-        q, r, type,
-        isRevealed: q === 0 && r === 0, 
-        hasForagedToday: false,
-        lastForagedDay: null,
-        pesticideLevel: 0,
-        resourceQuality: Math.floor(Math.random() * 50) + 50 
-      });
-    }
-  }
-
-  for(let i=0; i<2; i++) {
-     const angle = Math.random() * Math.PI * 2;
-     const startQ = Math.cos(angle) * MAP_RADIUS;
-     const startR = Math.sin(angle) * MAP_RADIUS;
-     const endQ = Math.cos(angle + Math.PI) * MAP_RADIUS;
-     const endR = Math.sin(angle + Math.PI) * MAP_RADIUS;
-     const dist = MAP_RADIUS * 2;
-     for(let t = 0; t <= 1; t += 1/dist) {
-         const currQ = lerp(startQ, endQ, t);
-         const currR = lerp(startR, endR, t);
-         const currS = -currQ - currR;
-         const { q, r } = cubeRound({ x: currQ, y: currS, z: currR });
-         const key = `${q},${r}`;
-         if(map.has(key)) {
-             const cell = map.get(key);
-             if(cell && cell.type !== TerrainType.NEST) {
-                 map.set(key, { ...cell, type: TerrainType.ROAD });
-             }
-         }
-     }
-  }
-
-  for (const [key, cell] of map) {
-     let pesticideLevel = 0;
-     if (cell.type === TerrainType.CROP) pesticideLevel = Math.random() * 0.8 + 0.2;
-     if (cell.type === TerrainType.URBAN) pesticideLevel = Math.random() * 0.4;
-     map.set(key, { ...cell, pesticideLevel });
-  }
-
-  return map;
-};
-
-const getRandomWeather = (): Weather => {
-  const r = Math.random();
-  if (r > 0.7) return Weather.RAINY;
-  if (r > 0.4) return Weather.CLOUDY;
-  return Weather.SUNNY;
-};
+import { createInitialState, startGame, move, forage, endDay } from './game/rules';
+import { RotateCcw, ShieldAlert, Trophy, BookOpen } from 'lucide-react';
 
 export default function App() {
   const [showTutorial, setShowTutorial] = useState(false);
-  const [gameState, setGameState] = useState<GameState>({
-    status: 'MENU',
-    day: 1,
-    weather: Weather.SUNNY,
-    species: null,
-    player: {
-      energy: START_ENERGY,
-      pollen: 0,
-      toxicity: 0,
-      q: 0,
-      r: 0,
-      isAlive: true,
-      history: []
-    },
-    map: new Map()
-  });
+  const [gameState, setGameState] = useState(createInitialState);
+  const screenTitle = useRef<HTMLHeadingElement>(null);
 
-  const startGame = (species: SpeciesStats) => {
-    setGameState({
-      status: 'PLAYING',
-      day: 1,
-      weather: Weather.SUNNY,
-      species,
-      player: {
-        energy: species.maxEnergy,
-        pollen: 0,
-        toxicity: 0,
-        q: 0,
-        r: 0,
-        isAlive: true,
-        history: [{ day: 1, event: `Season begins. Weather is Sunny.` }]
-      },
-      map: createMap()
-    });
-  };
+  useEffect(() => {
+    screenTitle.current?.focus();
+  }, [gameState.status]);
 
-  const handleExit = () => {
-    setGameState({
-      status: 'MENU',
-      day: 1,
-      weather: Weather.SUNNY,
-      species: null,
-      player: {
-        energy: START_ENERGY,
-        pollen: 0,
-        toxicity: 0,
-        q: 0,
-        r: 0,
-        isAlive: true,
-        history: []
-      },
-      map: new Map()
-    });
-  };
-
-  const addLog = (msg: string) => {
-    setGameState(prev => ({
-      ...prev,
-      player: {
-        ...prev.player,
-        history: [...prev.player.history, { day: prev.day, event: msg }]
-      }
-    }));
-  };
-
-  const checkDeath = (energy: number, toxicity: number, species: SpeciesStats, reason: string = "Starvation") => {
-    if (energy <= 0) {
-      setGameState(prev => ({
-        ...prev,
-        status: 'GAME_OVER',
-        player: { ...prev.player, isAlive: false, energy: 0, deathReason: reason }
-      }));
-      return true;
-    }
-    if (toxicity >= species.maxToxicity) {
-      setGameState(prev => ({
-        ...prev,
-        status: 'GAME_OVER',
-        player: { ...prev.player, isAlive: false, toxicity: species.maxToxicity, deathReason: "Pesticide Accumulation" }
-      }));
-      return true;
-    }
-    return false;
-  };
-
+  const handleStart = (species: SpeciesStats) => setGameState(startGame(species));
   const handleMove = (q: number, r: number) => {
-    if (gameState.status !== 'PLAYING' || !gameState.species) return;
-    
-    const dist = (Math.abs(gameState.player.q - q) + Math.abs(gameState.player.q + gameState.player.r - q - r) + Math.abs(gameState.player.r - r)) / 2;
-    
-    if (dist > gameState.species.flightRange) return; 
-
-    const weatherCost = WEATHER_EFFECTS[gameState.weather].moveCostMult;
-    let moveCost = gameState.species.energyCostMove * dist * weatherCost;
-
-    // --- SUB-LETHAL EFFECT: LETHARGY ---
-    const toxicityRatio = gameState.player.toxicity / gameState.species.maxToxicity;
-    let impairmentMsg = "";
-    if (toxicityRatio > 0.5) {
-        moveCost = moveCost * 1.5; 
-        if (Math.random() > 0.7) impairmentMsg = " (Lethargic flight...)";
-    }
-
-    if (gameState.player.energy < moveCost) {
-      addLog("Too tired to fly that far!");
-      return;
-    }
-
-    const newMap = new Map<string, HexCell>(gameState.map);
-    const targetKey = `${q},${r}`;
-    const targetCell = newMap.get(targetKey);
-    
-    const revealList = [{q, r}, {q: q+1, r: r}, {q: q-1, r: r}, {q: q, r: r+1}, {q: q, r: r-1}, {q: q+1, r: r-1}, {q: q-1, r: r+1}];
-    revealList.forEach(coord => {
-         const key = `${coord.q},${coord.r}`;
-         const cell = newMap.get(key);
-         if (cell) newMap.set(key, { ...cell, isRevealed: true });
-    });
-
-    let collisionEnergyLoss = 0;
-    if (targetCell && targetCell.type === TerrainType.ROAD) {
-        if (Math.random() < 0.25) {
-            collisionEnergyLoss = 35;
-            addLog("💥 CRITICAL: Hit by a vehicle crossing the road!");
-        }
-    }
-
-    let hydrationEnergy = 0;
-    let hydrationDetox = 0;
-    if (targetCell && targetCell.type === TerrainType.WATER) {
-        hydrationEnergy = 10; 
-        hydrationDetox = 5;
-        addLog("💧 Hydration boost! Energy gained, toxins flushed.");
-    }
-
-    let addedToxicity = 0;
-    if (targetCell && targetCell.pesticideLevel > 0) {
-       const intakeFactor = (1 - gameState.species.pesticideResilience); 
-       addedToxicity = targetCell.pesticideLevel * 15 * intakeFactor; 
-    }
-
-    let newEnergy = gameState.player.energy - moveCost - collisionEnergyLoss + hydrationEnergy;
-    newEnergy = Math.min(newEnergy, gameState.species.maxEnergy); 
-    
-    const newToxicity = Math.max(0, gameState.player.toxicity + addedToxicity - hydrationDetox);
-    
-    if (addedToxicity > 2) addLog(`Warning: High pesticide levels detected.${impairmentMsg}`);
-    else if (impairmentMsg) addLog(`Movement labored due to toxicity.${impairmentMsg}`);
-
-    setGameState(prev => {
-      return {
-        ...prev,
-        map: newMap,
-        player: {
-          ...prev.player,
-          q, r,
-          energy: newEnergy,
-          toxicity: newToxicity
-        }
-      };
-    });
-
-    if (newEnergy <= 0 && collisionEnergyLoss > 0) {
-        checkDeath(newEnergy, newToxicity, gameState.species, "Vehicle Collision");
-    } else {
-        checkDeath(newEnergy, newToxicity, gameState.species, "Starvation");
-    }
+    if (!showTutorial) setGameState(previous => move(previous, q, r));
   };
-
   const handleForage = () => {
-    if (gameState.status !== 'PLAYING' || !gameState.species) return;
-    const { player, map, species, weather, day } = gameState;
-    const cellKey = `${player.q},${player.r}`;
-    const cell = map.get(cellKey);
-
-    if (!cell || cell.type === TerrainType.NEST || cell.type === TerrainType.ROAD) return;
-    if (cell.lastForagedDay !== null && (day - cell.lastForagedDay) < 3) {
-        addLog("Resource depleted. Needs time to regenerate.");
-        return;
-    }
-
-    const forageCost = species.energyCostForage;
-    if (player.energy < forageCost) {
-      addLog("Too exhausted to forage.");
-      return;
-    }
-
-    const weatherMult = WEATHER_EFFECTS[weather].resourceMult;
-    let baseAmount = cell.resourceQuality * species.forageEfficiency * weatherMult * 0.1; 
-    
-    // --- SUB-LETHAL EFFECT: CONFUSION ---
-    const toxicityRatio = player.toxicity / species.maxToxicity;
-    let impairmentMsg = "";
-    if (toxicityRatio > 0.5) {
-        baseAmount = baseAmount * 0.75; 
-        impairmentMsg = " (Clumsy foraging...)";
-    }
-
-    let extraLog = "";
-    let sugarRushEnergy = 0; 
-    let bioControlBonus = 0; 
-
-    if (cell.type === TerrainType.CROP) {
-        baseAmount = baseAmount * 1.5; 
-        sugarRushEnergy = 5; 
-        extraLog = " High yield crop!";
-
-        if (species.name === SpeciesType.HOVERFLY) {
-            bioControlBonus = 15; 
-            extraLog = " Bio-control bonus (aphids eaten)!";
-        }
-    }
-    
-    baseAmount = Math.floor(baseAmount);
-
-    let addedToxicity = 0;
-    let toxicityMsg = "";
-    
-    if (cell.pesticideLevel > 0) {
-         const intakeFactor = (1 - species.pesticideResilience);
-         addedToxicity = cell.pesticideLevel * 5 * intakeFactor;
-         if (addedToxicity > 1) toxicityMsg = " Tainted resource!";
-    }
-
-    const newMap = new Map<string, HexCell>(map);
-    newMap.set(cellKey, { ...cell, lastForagedDay: day, hasForagedToday: true }); 
-
-    let newEnergy = player.energy - forageCost + (baseAmount * 0.5) + sugarRushEnergy;
-    newEnergy = Math.min(newEnergy, species.maxEnergy);
-    const newToxicity = player.toxicity + addedToxicity;
-
-    const collectedAmount = baseAmount + bioControlBonus;
-
-    setGameState(prev => ({
-      ...prev,
-      map: newMap,
-      player: {
-        ...prev.player,
-        energy: newEnergy,
-        pollen: prev.player.pollen + collectedAmount,
-        toxicity: newToxicity
-      }
-    }));
-
-    if (species.name === SpeciesType.HOVERFLY) {
-         addLog(`Fed on nectar.${toxicityMsg}${extraLog}${impairmentMsg}`);
-    } else {
-         addLog(`Collected ${collectedAmount} pollen.${toxicityMsg}${extraLog}${impairmentMsg}`);
-    }
-    
-    checkDeath(newEnergy, newToxicity, species, "Starvation");
+    if (!showTutorial) setGameState(previous => forage(previous));
   };
-
-  const handleEndTurn = () => {
-    if (gameState.status !== 'PLAYING' || !gameState.species) return;
-    
-    const isAtNest = gameState.player.q === 0 && gameState.player.r === 0;
-    
-    let energyChange = 0;
-    let logMsg = "Night falls. ";
-
-    if (isAtNest) {
-        energyChange = 40; 
-        logMsg += "Restored energy in safety of nest.";
-    } else {
-        energyChange = 20; 
-        logMsg += "Rested in the open (recovered some energy).";
-        if (Math.random() > 0.85) {
-             checkDeath(0, gameState.player.toxicity, gameState.species, "Predation during night");
-             return;
-        }
-    }
-
-    const newEnergy = Math.min(gameState.player.energy + energyChange, gameState.species.maxEnergy);
-    
-    if (gameState.day >= MAX_DAYS) {
-        setGameState(prev => ({ ...prev, status: 'GAME_OVER', player: { ...prev.player, energy: newEnergy } }));
-        return;
-    }
-
-    const newWeather = getRandomWeather();
-    
-    setGameState(prev => {
-        const nextDay = prev.day + 1;
-        const newMap = new Map<string, HexCell>();
-        
-        for (const [key, cell] of prev.map) {
-             let nextCell = { ...cell };
-             if (cell.lastForagedDay !== null && (nextDay - cell.lastForagedDay) >= 3) {
-                 nextCell.hasForagedToday = false;
-                 nextCell.lastForagedDay = null; 
-             }
-             newMap.set(key, nextCell);
-        }
-
-        return {
-            ...prev,
-            day: nextDay,
-            weather: newWeather,
-            map: newMap,
-            player: {
-                ...prev.player,
-                energy: newEnergy,
-                history: [...prev.player.history, { day: prev.day, event: logMsg }, { day: nextDay, event: `Day ${nextDay}: ${newWeather} weather.` }]
-            }
-        };
-    });
+  const handleRest = () => {
+    if (!showTutorial) setGameState(previous => endDay(previous));
   };
-
-  if (gameState.status === 'MENU') {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-slate-900 text-center">
-        <TutorialModal isOpen={showTutorial} onClose={() => setShowTutorial(false)} />
-        
-        <h1 className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-amber-400 to-orange-600 mb-4">
-          Pollinator
-        </h1>
-        <p className="text-slate-400 max-w-xl mb-8 text-lg">
-          Choose your species. Forage for survival. Navigate a fragmented landscape and adapt to survive the season.
-        </p>
-        
-        <button 
-          onClick={() => setShowTutorial(true)}
-          className="mb-12 flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 px-6 py-3 rounded-full transition-all"
-        >
-          <BookOpen className="w-5 h-5" />
-          How to Play / Field Guide
-        </button>
-
-        <div className="flex flex-wrap gap-6 justify-center">
-          {Object.values(SPECIES_DATA).map(s => (
-            <SpeciesCard key={s.name} species={s} onSelect={startGame} />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (gameState.status === 'GAME_OVER') {
-    const isHoverfly = gameState.species?.name === SpeciesType.HOVERFLY;
-    const isSolitary = gameState.species?.name === SpeciesType.SOLITARY_BEE;
-    const isBumble = gameState.species?.name === SpeciesType.BUMBLEBEE;
-
-    let successLabel = "Ecological Score";
-    let successValue = gameState.player.pollen;
-    let successSuffix = "points";
-
-    if (isHoverfly) {
-        successLabel = "Reproductive Success (Eggs)";
-        successValue = Math.floor(gameState.player.pollen / 3);
-        successSuffix = "Larvae";
-    } else if (isSolitary) {
-        successLabel = "Nests Provisioned";
-        successValue = Math.floor(gameState.player.pollen / 15);
-        successSuffix = "Offspring Cells";
-    } else if (isBumble) {
-        successLabel = "Colony Growth";
-        successValue = Math.floor(gameState.player.pollen * 0.6);
-        successSuffix = "New Workers";
+  const handleExit = () => {
+    if (!showTutorial && window.confirm('Leave this simulation? Your current progress will be lost.')) {
+      setGameState(createInitialState());
     }
-
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-950 text-center animate-in fade-in duration-1000">
-         <div className="max-w-2xl w-full bg-slate-900 border border-slate-700 rounded-2xl p-8 shadow-2xl">
-            
-            <div className="mb-8">
-                {gameState.player.isAlive ? (
-                    <Trophy className="w-16 h-16 mx-auto text-yellow-400 mb-4" />
-                ) : (
-                    <ShieldAlert className="w-16 h-16 mx-auto text-red-500 mb-4" />
-                )}
-                <h2 className="text-3xl font-bold text-white mb-2">
-                    {gameState.player.isAlive ? "Season Complete!" : "Simulation Ended"}
-                </h2>
-                <p className="text-slate-400 text-lg">
-                    {gameState.player.deathReason 
-                        ? `Cause of Death: ${gameState.player.deathReason}` 
-                        : `You survived all ${MAX_DAYS} days.`}
-                </p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
-                    <div className="text-slate-500 text-xs uppercase tracking-wider">Days Survived</div>
-                    <div className="text-2xl font-mono text-amber-400">{gameState.day}</div>
-                </div>
-                 <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
-                    <div className="text-slate-500 text-xs uppercase tracking-wider">Toxicity Load</div>
-                    <div className={`text-2xl font-mono ${gameState.player.toxicity > 50 ? 'text-red-500' : 'text-emerald-400'}`}>
-                      {gameState.player.toxicity.toFixed(0)}
-                    </div>
-                </div>
-                 <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
-                    <div className="text-slate-500 text-xs uppercase tracking-wider">{isHoverfly ? "Nectar Units" : "Pollen Units"}</div>
-                    <div className="text-2xl font-mono text-pink-400">{gameState.player.pollen}</div>
-                </div>
-            </div>
-
-            <div className="bg-gradient-to-r from-emerald-900/50 to-slate-800 border border-emerald-800 p-6 rounded-xl mb-8">
-                <div className="flex items-center justify-center gap-3 text-emerald-400 mb-2">
-                    <Baby className="w-6 h-6" />
-                    <h3 className="text-lg font-bold uppercase tracking-widest">{successLabel}</h3>
-                </div>
-                <div className="text-5xl font-bold text-white mb-1">{successValue}</div>
-                <div className="text-emerald-200 text-sm opacity-80">{successSuffix} produced</div>
-                {!gameState.player.isAlive && (
-                    <p className="text-xs text-red-400 mt-2">Success limited by premature death.</p>
-                )}
-            </div>
-
-            <div className="text-slate-400 italic text-sm mb-6">
-                Please record these values for your practical worksheet.
-            </div>
-
-            <button 
-                onClick={() => setGameState(prev => ({...prev, status: 'MENU'}))}
-                className="mt-2 bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-8 rounded-full transition-all flex items-center gap-2 mx-auto"
-            >
-                <RotateCcw className="w-5 h-5" />
-                New Simulation
-            </button>
-         </div>
-      </div>
-    );
-  }
+  };
 
   return (
-    <div className="w-full h-full bg-slate-950 relative">
+    <>
       <TutorialModal isOpen={showTutorial} onClose={() => setShowTutorial(false)} />
-      
-      <HexGrid 
-        map={gameState.map} 
-        playerQ={gameState.player.q} 
-        playerR={gameState.player.r}
-        playerSpecies={gameState.species?.name}
-        onHexClick={handleMove}
-        playerRange={gameState.species?.flightRange || 0}
-        day={gameState.day}
-      />
-      
-      <HUD 
-        gameState={gameState} 
-        currentHex={gameState.map.get(`${gameState.player.q},${gameState.player.r}`)}
-        onForage={handleForage}
-        onRest={handleEndTurn}
-        onOpenHelp={() => setShowTutorial(true)}
-        onExit={handleExit}
-      />
-
-      <EventLog logs={gameState.player.history} />
-    </div>
+      {gameState.status === 'MENU' ? (
+        <main className="min-h-screen flex flex-col items-center justify-center px-4 py-10 sm:p-8 bg-slate-900 text-center">
+          <h1 ref={screenTitle} tabIndex={-1} className="text-4xl sm:text-5xl font-bold text-amber-400 mb-4">Pollinator Hex</h1>
+          <p className="text-slate-300 max-w-xl mb-4 text-lg">Choose your pollinator. Explore the landscape and balance the costs of foraging with the resources you collect.</p>
+          <p className="text-sm text-slate-400 max-w-xl mb-6">A {MAX_DAYS}-day teaching game with simplified ecological rules. Survival and resource collection are separate outcomes.</p>
+          <button onClick={() => setShowTutorial(true)} className="mb-8 flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-500 text-slate-100 px-6 py-3 rounded-full">
+            <BookOpen className="w-5 h-5" aria-hidden="true" /> How to Play / Field Guide
+          </button>
+          <div className="flex flex-wrap gap-6 justify-center w-full max-w-6xl">
+            {Object.values(SPECIES_DATA).map(species => <SpeciesCard key={species.name} species={species} onSelect={handleStart} />)}
+          </div>
+          <p className="mt-6 text-sm text-slate-400 max-w-xl">Select a card to begin. You can play with a mouse, touch, or the keyboard. The field guide explains the controls and model assumptions.</p>
+        </main>
+      ) : gameState.status === 'GAME_OVER' ? (() => {
+        const species = gameState.species!;
+        const isHoverfly = species.name === SpeciesType.HOVERFLY;
+        const score = isHoverfly ? Math.floor(gameState.player.pollen / 3) : species.name === SpeciesType.SOLITARY_BEE ? Math.floor(gameState.player.pollen / 15) : Math.floor(gameState.player.pollen * 0.6);
+        const conversion = isHoverfly ? 'collected resource units ÷ 3, rounded down' : species.name === SpeciesType.SOLITARY_BEE ? 'collected resource units ÷ 15, rounded down' : 'collected resource units × 0.6, rounded down';
+        const toxicityRatio = gameState.player.toxicity / species.maxToxicity;
+        return (
+          <main className="min-h-screen flex items-center justify-center px-4 py-10 bg-slate-950">
+            <div className="max-w-2xl w-full bg-slate-900 border border-slate-700 rounded-2xl p-5 sm:p-8 text-center">
+              {gameState.player.isAlive ? <Trophy className="w-14 h-14 mx-auto text-amber-400 mb-4" aria-hidden="true" /> : <ShieldAlert className="w-14 h-14 mx-auto text-red-400 mb-4" aria-hidden="true" />}
+              <h1 ref={screenTitle} tabIndex={-1} className="text-3xl font-bold mb-2">{gameState.player.isAlive ? 'Season complete' : 'Simulation ended'}</h1>
+              <p className="text-slate-300 mb-2">{gameState.player.deathReason ? `Cause of death: ${gameState.player.deathReason}` : `You survived all ${MAX_DAYS} days.`}</p>
+              <p className="text-amber-200 mb-6">{species.name}</p>
+              <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                <div className="bg-slate-800 p-4 rounded-lg"><dt className="text-slate-300 text-sm">Day reached</dt><dd className="text-2xl font-mono text-amber-300">{gameState.day}</dd></div>
+                <div className="bg-slate-800 p-4 rounded-lg"><dt className="text-slate-300 text-sm">Toxicity load</dt><dd className={`text-2xl font-mono ${toxicityRatio >= 1 ? 'text-red-300' : toxicityRatio > 0.5 ? 'text-amber-300' : 'text-emerald-300'}`}>{gameState.player.toxicity.toFixed(1)} / {species.maxToxicity}</dd></div>
+                <div className="bg-slate-800 p-4 rounded-lg"><dt className="text-slate-300 text-sm">{isHoverfly ? 'Floral resource units' : 'Pollen units'} collected</dt><dd className="text-2xl font-mono text-pink-300">{gameState.player.pollen}</dd></div>
+              </dl>
+              <section className="bg-emerald-950/50 border border-emerald-800 rounded-xl p-5 mb-6" aria-labelledby="score-heading">
+                <h2 id="score-heading" className="text-lg font-semibold text-emerald-200">Illustrative reproductive score</h2>
+                <p className="text-5xl font-bold my-3">{score} <span className="text-base font-normal">points</span></p>
+                <p className="text-sm text-slate-300">Game calculation: {conversion}.</p>
+                <p className="text-sm text-slate-300 mt-2">This is a resource-based teaching score, not a prediction of workers, eggs or surviving offspring. Compare scores within the same pollinator type.</p>
+                {gameState.player.pollen === 0 && <p className="mt-3 text-amber-200">No resources were collected. Surviving alone does not earn reproductive points.</p>}
+              </section>
+              <p className="text-sm text-slate-300 mb-5">Record the pollinator, day reached, resources and score for your practical worksheet. Which choices affected your result?</p>
+              <EventLog logs={gameState.player.history} />
+              <div className="flex flex-wrap justify-center gap-3 mt-6">
+                <button onClick={() => setShowTutorial(true)} className="px-4 py-3 rounded-lg border border-slate-500 hover:bg-slate-800">Model assumptions / Help</button>
+                <button onClick={() => setGameState(createInitialState())} className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold py-3 px-6 rounded-lg flex items-center gap-2"><RotateCcw className="w-5 h-5" aria-hidden="true" /> New simulation</button>
+              </div>
+            </div>
+          </main>
+        );
+      })() : (
+        <main className="min-h-screen bg-slate-950 p-3 sm:p-5">
+          <header className="max-w-[1440px] mx-auto mb-4 flex flex-wrap items-baseline justify-between gap-2">
+            <h1 ref={screenTitle} tabIndex={-1} className="text-2xl font-bold text-amber-300">Pollinator Hex</h1>
+            <p className="text-sm text-slate-300">Explore, collect resources and review your decisions.</p>
+          </header>
+          <div className="max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
+            <section aria-label="Landscape and movement" className="min-w-0 bg-slate-900/40 border border-slate-800 rounded-xl p-2 sm:p-4">
+              <HexGrid gameState={gameState} onHexClick={handleMove} />
+            </section>
+            <aside aria-label="Pollinator status and actions" className="min-w-0 space-y-4">
+              <HUD gameState={gameState} currentHex={gameState.map.get(`${gameState.player.q},${gameState.player.r}`)} onForage={handleForage} onRest={handleRest} onOpenHelp={() => setShowTutorial(true)} onExit={handleExit} />
+              <EventLog logs={gameState.player.history} />
+            </aside>
+          </div>
+        </main>
+      )}
+    </>
   );
 }
