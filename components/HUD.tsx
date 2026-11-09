@@ -1,7 +1,7 @@
 import React from 'react';
 import { GameState, HexCell, TerrainType, SpeciesType } from '../types';
 import { MAX_DAYS, WEATHER_EFFECTS, TERRAIN_CONFIG, HOVERFLY_APHID_BONUS_MULTIPLIER } from '../constants';
-import { getReproductiveScore, hasNearbyAphids, isSafeShelter } from '../game/rules';
+import { getReproductiveScore, getResourceQuantity, hasNearbyAphids, isSafeShelter } from '../game/rules';
 import { Battery, CloudRain, Sun, Cloud, Flower, Skull, HelpCircle, LogOut } from 'lucide-react';
 import { formatEventForDisplay } from './formatEvent';
 
@@ -35,7 +35,7 @@ export const HUD: React.FC<Props> = ({ gameState, currentHex, onOpenHelp, onExit
           <div><div className="flex justify-between gap-3 mb-1"><dt className="flex gap-2 items-center text-sm"><Skull className="w-4 h-4 text-purple-300" aria-hidden="true" />Toxicity</dt><dd className="font-mono text-sm">{player.toxicity.toFixed(1)} / {species.maxToxicity}</dd></div><progress aria-label="Toxicity" value={player.toxicity} max={species.maxToxicity} className="w-full h-2 accent-purple-400" /></div>
           <div className="border-t border-slate-700 pt-3 flex justify-between gap-3">
             <dt className="text-sm flex items-center gap-2"><Flower className="w-4 h-4 text-pink-300" aria-hidden="true" />Resources gathered</dt>
-            <dd className="text-right"><span className="font-mono font-semibold text-emerald-200">{player.pollen}</span><span className="block text-xs text-slate-300">{isHoverfly ? 'resource units' : 'mg pollen-equivalent'}</span></dd>
+            <dd className="text-right"><span className="font-mono font-semibold text-emerald-200">{getResourceQuantity(species.name, player.pollen).toLocaleString('en-GB', { maximumFractionDigits: 2 })}</span><span className="block text-xs text-slate-300">{isHoverfly ? 'resource units' : 'mg pollen-equivalent'}</span></dd>
           </div>
         </dl>
         <div className="mt-4 rounded-lg border border-emerald-800 bg-emerald-950/30 p-3">

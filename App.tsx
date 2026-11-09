@@ -9,7 +9,7 @@ import { HUD } from './components/HUD';
 import { GameActions } from './components/GameActions';
 import { EventLog } from './components/EventLog';
 import { TutorialModal } from './components/TutorialModal';
-import { createInitialState, startGame, move, forage, endDay, getReproductiveScore } from './game/rules';
+import { createInitialState, startGame, move, forage, endDay, getReproductiveScore, getResourceQuantity } from './game/rules';
 import { DEFAULT_CONFIG, normaliseConfig, SCENARIOS } from './game/scenarios';
 import { createTrialResult, loadTrials, saveTrials, resultsToCsv, eventsToCsv, MAX_SAVED_TRIALS } from './game/trials';
 import { RotateCcw, ShieldAlert, Trophy, BookOpen } from 'lucide-react';
@@ -93,6 +93,7 @@ export default function App() {
       const species = gameState.species!;
       const isHoverfly = species.name === SpeciesType.HOVERFLY;
       const output = getReproductiveScore(gameState);
+      const resources = getResourceQuantity(species.name, gameState.player.pollen).toLocaleString('en-GB', { maximumFractionDigits: 2 });
       const scenario = SCENARIOS[gameState.config.scenarioId];
       return <main className="min-h-screen bg-slate-950 p-4 sm:p-8 flex flex-col items-center gap-6">
         <section className="max-w-4xl w-full bg-slate-900 border border-slate-700 rounded-2xl p-5 sm:p-8 text-center">
@@ -105,13 +106,13 @@ export default function App() {
             <h2 id="output-heading" className="text-lg font-semibold text-emerald-200">Reproductive output</h2>
             <p className="text-6xl font-bold my-3">{output.score}</p>
             <p className="text-xl text-emerald-100">{output.label}</p>
-            <p className="text-sm text-slate-300 mt-3">{isHoverfly ? `${gameState.player.pollen} resource units gathered, including habitat bonuses; ${HOVERFLY_RESOURCES_PER_EGG} units support one potential egg.` : `${gameState.player.pollen} mg pollen-equivalent gathered; ${species.name === SpeciesType.BUMBLEBEE ? BUMBLEBEE_POLLEN_PER_WORKER_MG : SOLITARY_POLLEN_PER_CELL_MG} mg per ${species.name === SpeciesType.BUMBLEBEE ? 'worker supported' : 'nest cell'}.`}</p>
+            <p className="text-sm text-slate-300 mt-3">{isHoverfly ? `${resources} resource units gathered, including habitat bonuses; ${HOVERFLY_RESOURCES_PER_EGG} units support one potential egg.` : `${resources} mg pollen-equivalent gathered; ${species.name === SpeciesType.BUMBLEBEE ? BUMBLEBEE_POLLEN_PER_WORKER_MG : SOLITARY_POLLEN_PER_CELL_MG} mg per ${species.name === SpeciesType.BUMBLEBEE ? 'worker supported' : 'nest cell'}.`}</p>
             <p className="text-xs text-slate-300 mt-2">Resources translate automatically into fictional reproductive output. Development and offspring survival are not simulated.</p>
           </section>
           <p className="rounded-lg bg-amber-950/30 p-3 text-amber-100 mb-5">For the class graph: {species.name} · {gameState.config.treatment === 'control' ? 'Control' : 'Treatment'} · <strong>{output.score} {output.label.toLowerCase()}</strong></p>
           <dl className="grid grid-cols-3 gap-3 mb-5 text-sm">
             {[
-              ['Resources gathered', gameState.player.pollen], ['Days completed', gameState.metrics.completedDays], ['Distance (hexes)', gameState.metrics.distance],
+              [isHoverfly ? 'Resources (units)' : 'Pollen-equivalent (mg)', resources], ['Days completed', gameState.metrics.completedDays], ['Distance (hexes)', gameState.metrics.distance],
             ].map(([label, value]) => <div key={label} className="bg-slate-800 p-3 rounded-lg"><dt className="text-slate-300">{label}</dt><dd className="font-mono text-xl mt-1 text-amber-200">{value}</dd></div>)}
           </dl>
           <p className="text-sm text-amber-100 mb-4">Interpret: {scenario.question} Which differences reflect your choices, and which reflect the landscape?</p>

@@ -4,7 +4,7 @@ export const HEX_SIZE = 30;
 export const MAP_RADIUS = 6;
 export const MAX_DAYS = 15;
 export const START_ENERGY = 100;
-export const MODEL_VERSION = '3.2';
+export const MODEL_VERSION = '3.3';
 // Energy is a simple activity budget: feeding helps a little; rest restores stamina.
 export const ENERGY_PER_RESOURCE = 0.5;
 export const CROP_ENERGY_BONUS = 5;
@@ -71,8 +71,10 @@ export const WEATHER_EFFECTS: Record<Weather, { moveCostMult: number, resourceMu
 };
 
 // Research-informed reference quantities, rounded for the fictionalised game.
-// Bee resource units are standardised pollen-equivalents, not measured field loads.
-export const POLLEN_MG_PER_UNIT = 1;
+// Species-specific allocation scales calibrate fictional colony/individual output.
+// These pollen-equivalents are not measured field loads and never affect food energy.
+export const BUMBLEBEE_POLLEN_MG_PER_UNIT = 15;
+export const SOLITARY_POLLEN_MG_PER_UNIT = 1.25;
 export const BUMBLEBEE_POLLEN_PER_WORKER_MG = 60;
 export const SOLITARY_POLLEN_PER_CELL_MG = 65;
 export const REPRESENTATIVE_SPECIES: Record<SpeciesType, string> = {

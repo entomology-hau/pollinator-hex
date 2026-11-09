@@ -1,6 +1,6 @@
 # Energy balance checks
 
-Model 3.2 returns to the original activity-and-rest loop. The main objective is reproductive output. Energy limits how much collecting and travelling a pollinator can do before it needs to rest; survival alone is not a high score.
+Model 3.2 returned to the original activity-and-rest loop; model 3.3 retains that energy balance. The main objective is reproductive output. Energy limits how much collecting and travelling a pollinator can do before it needs to rest; survival alone is not a high score.
 
 ## Balance changes
 
@@ -40,6 +40,18 @@ A pollinator that rests at the nest for the entire season survives but collects 
 
 ## Reproduction and reproducibility
 
-Resource-to-offspring conversions and the hoverfly aphid bonus are unchanged. Keep model 3.2 results separate from earlier versions when comparing class outputs.
+Model 3.3 calibrates bee reproductive allocation while preserving the model 3.2 energy, movement, yield, cooldown and hazard rules. Each underlying resource unit now represents 15 mg pollen-equivalent for bumblebee colony support or 1.25 mg for solitary-bee nest provisioning. The offspring requirements remain 60 mg per worker and 65 mg per nest cell. Hoverfly output and the aphid bonus are unchanged.
+
+The calibration uses the strongest productive seasons found in a search of 72 strategies across 10 landscape seeds and all six scenario/condition combinations. Strategies knew the whole map, avoided roads, reserved energy for safe shelter, and kept toxicity below impairment. These are high-output examples, not proven maxima or expected student outcomes.
+
+| Pollinator | Underlying resources in calibration run | Displayed reproductive resources | Model 3.2 output | Model 3.3 output |
+| --- | ---: | ---: | ---: | ---: |
+| Bumblebee | 1,227 | 18,405 mg pollen-equivalent | 20 workers | 306 workers |
+| Solitary bee | 1,605 | 2,006.25 mg pollen-equivalent | 24 nest cells | 30 nest cells |
+| Hoverfly | 1,609 | 1,609 resource units | 536 eggs | 536 eggs |
+
+The bumblebee and hoverfly examples use `hau-ecology-01`; the solitary-bee example uses `output-estimate-6`. All use the reduced-pesticide treatment and complete 15 days. Calibration targets of about 300 workers and 30 nest cells are not hard caps; a different route or landscape can produce more. The allocation factors compress reproductive resource support and do not describe a measured pollen load per flight.
+
+Keep model 3.3 results separate from earlier versions when comparing class outputs. New screen totals and exports use the scaled reproductive quantities; saved older results are left unchanged.
 
 Run `node --import tsx --test tests/energy-balance.test.ts`. The six tests cover the bounded collecting route and cautious versus inactive seasons. Existing rules tests separately cover rest capacity limits, exposed-night risks, crop feeding, flower recovery, depletion, exhaustion, hazards and reproductive conversions.

@@ -2,7 +2,7 @@ import React from 'react';
 import { Battery, Flower, Moon } from 'lucide-react';
 import { GameState, HexCell, SpeciesType, TerrainType } from '../types';
 import { MAX_DAYS, TERRAIN_CONFIG } from '../constants';
-import { getForageBlockReason, getForagePreview, getRestPreview } from '../game/rules';
+import { getForageBlockReason, getForagePreview, getResourceQuantity, getRestPreview } from '../game/rules';
 
 interface Props {
   gameState: GameState;
@@ -39,7 +39,7 @@ export const GameActions: React.FC<Props> = ({ gameState, currentHex, onForage, 
       <div className="grid grid-cols-2 gap-3">
         <div className="min-w-0">
           <button onClick={onForage} disabled={Boolean(blockedReason)} aria-describedby="forage-explanation" className="flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-amber-400 px-2 py-3 text-sm font-bold text-slate-950 hover:bg-amber-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300 sm:text-base"><Flower className="h-5 w-5 shrink-0" aria-hidden="true" />Forage</button>
-          <p id="forage-explanation" className="mt-2 text-xs leading-relaxed text-slate-200">{blockedReason || (forage && <>{energyNote} Gather {forage.creditedResources} {species.name === SpeciesType.HOVERFLY ? 'resource units' : 'mg pollen-equivalent'}.</>)}</p>
+          <p id="forage-explanation" className="mt-2 text-xs leading-relaxed text-slate-200">{blockedReason || (forage && <>{energyNote} Gather {getResourceQuantity(species.name, forage.creditedResources).toLocaleString('en-GB', { maximumFractionDigits: 2 })} {species.name === SpeciesType.HOVERFLY ? 'resource units' : 'mg pollen-equivalent'}.</>)}</p>
         </div>
         <div className="min-w-0">
           <button onClick={onRest} aria-describedby="rest-explanation" className="flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-2 py-3 text-sm font-bold text-white hover:bg-emerald-600 sm:text-base"><Moon className="h-5 w-5 shrink-0" aria-hidden="true" />Rest &amp; end day</button>
