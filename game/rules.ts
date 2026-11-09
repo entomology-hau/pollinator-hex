@@ -1,6 +1,6 @@
 import {
-  BUMBLEBEE_POLLEN_PER_WORKER_MG, ENERGY_PER_RESOURCE, HOVERFLY_APHID_BONUS_MULTIPLIER, HOVERFLY_RESOURCES_PER_EGG,
-  MAX_DAYS, POLLEN_MG_PER_UNIT, RESOURCE_REGEN_DAYS, SOLITARY_POLLEN_PER_CELL_MG, START_ENERGY, WEATHER_EFFECTS
+  BUMBLEBEE_POLLEN_PER_WORKER_MG, CROP_ENERGY_BONUS, ENERGY_PER_RESOURCE, HOVERFLY_APHID_BONUS_MULTIPLIER, HOVERFLY_RESOURCES_PER_EGG,
+  MAX_DAYS, OPEN_REST_RECOVERY, POLLEN_MG_PER_UNIT, RESOURCE_REGEN_DAYS, SHELTER_REST_RECOVERY, SOLITARY_POLLEN_PER_CELL_MG, START_ENERGY, WEATHER_EFFECTS
 } from '../constants';
 import { GameState, HexCell, RunConfig, SpeciesStats, SpeciesType, TerrainType, Weather } from '../types';
 import { createScenario, DEFAULT_CONFIG, normaliseConfig } from './scenarios';
@@ -72,7 +72,7 @@ export const startGame = (species: SpeciesStats, config: RunConfig = DEFAULT_CON
 const log = (state: GameState, event: string): GameState => ({
   ...state, player: { ...state.player, history: [...state.player.history, { day: state.day, event }] }
 });
-const finishIfDead = (state: GameState, energyReason = 'Starvation'): GameState => {
+const finishIfDead = (state: GameState, energyReason = 'Exhaustion'): GameState => {
   if (!state.species) return state;
   const energy = clamp(state.player.energy, state.species.maxEnergy);
   const toxicity = clamp(state.player.toxicity, state.species.maxToxicity);
@@ -152,7 +152,7 @@ export const move = (state: GameState, q: number, r: number, rng?: RandomSource)
       player: { ...next.player, ...point, energy, toxicity: next.player.toxicity + exposure }
     };
     if (exposure > 0) next = log(next, `Pesticide exposure on arrival: +${exposure.toFixed(1)} toxicity.`);
-    next = finishIfDead(next, collision ? 'Vehicle Collision' : 'Starvation');
+    next = finishIfDead(next, collision ? 'Vehicle Collision' : 'Exhaustion');
     if (next.status === 'GAME_OVER') return next;
   }
   const waterNote = map.get(`${q},${r}`)?.type === TerrainType.WATER ? ' Water provides no food or detoxification.' : '';
@@ -178,7 +178,7 @@ export const getForagePreview = (state: GameState): ForagePreview | null => {
   const harvest = Math.floor(cell.resourceQuality * species.forageEfficiency * WEATHER_EFFECTS[state.weather].resourceMult * 0.1 * (impaired ? 0.75 : 1) * (cell.type === TerrainType.CROP ? 1.5 : 1));
   const creditedResources = isHoverfly(state) && hasNearbyAphids(state)
     ? Math.floor(harvest * HOVERFLY_APHID_BONUS_MULTIPLIER) : harvest;
-  const foodEnergy = harvest * ENERGY_PER_RESOURCE;
+  const foodEnergy = harvest * ENERGY_PER_RESOURCE + (cell.type === TerrainType.CROP ? CROP_ENERGY_BONUS : 0);
   const energyAfter = clamp(state.player.energy + foodEnergy - species.energyCostForage, species.maxEnergy);
   return { harvest, creditedResources, foodEnergy, energyAfter, energyChange: energyAfter - state.player.energy };
 };
@@ -230,20 +230,28 @@ export const isSafeShelter = (state: GameState): boolean => {
   const type = state.map.get(keyOf(state.player))?.type;
   return type === TerrainType.NEST || (isHoverfly(state) && (type === TerrainType.FOREST || type === TerrainType.URBAN));
 };
+
+export interface RestPreview { energyAfter: number; energyChange: number; sheltered: boolean }
+
+/** Rest restores activity energy if the pollinator survives the night. */
+export const getRestPreview = (state: GameState): RestPreview | null => {
+  if (!isPlaying(state)) return null;
+  const sheltered = isSafeShelter(state);
+  const recovery = sheltered ? SHELTER_REST_RECOVERY : OPEN_REST_RECOVERY;
+  const energyAfter = clamp(state.player.energy + recovery, state.species!.maxEnergy);
+  return { energyAfter, energyChange: energyAfter - state.player.energy, sheltered };
+};
+
 export const endDay = (state: GameState, rng?: RandomSource): GameState => {
   if (!isPlaying(state)) return state;
-  const maintenance = state.species!.dailyMaintenance;
-  let next = finishIfDead(log({
-    ...state,
-    metrics: { ...state.metrics, energySpent: state.metrics.energySpent + maintenance },
-    player: { ...state.player, energy: state.player.energy - maintenance }
-  }, `Day ${state.day} ends. Maintenance uses ${maintenance} energy; resting provides no food or energy.`));
-  if (next.status === 'GAME_OVER') return next;
-  const sheltered = isSafeShelter(state);
+  const { sheltered, energyAfter, energyChange } = getRestPreview(state)!;
   if (!sheltered && (rng ? rng() : randomUnit(state.config.seed, 'night', String(state.day))) < NIGHT_PREDATION_CHANCE) {
-    return finishIfDead({ ...next, player: { ...next.player, energy: 0 } }, 'Predation during night');
+    return finishIfDead({ ...state, player: { ...state.player, energy: 0 } }, 'Predation during night');
   }
-  next = log({ ...next, metrics: { ...next.metrics, completedDays: next.metrics.completedDays + 1 } }, sheltered ? 'Sheltered safely for the night.' : 'Survived the night in the open.');
+  let next = log({
+    ...state, player: { ...state.player, energy: energyAfter },
+    metrics: { ...state.metrics, completedDays: state.metrics.completedDays + 1 }
+  }, `${sheltered ? 'Rested safely in shelter.' : 'Survived a rest in the open.'} Recovered ${energyChange.toFixed(1)} energy (now ${energyAfter.toFixed(1)}/${state.species!.maxEnergy}).`);
   if (state.day >= MAX_DAYS) return log({ ...next, status: 'GAME_OVER' }, 'Season complete. Review survival, gathered resources and reproductive output.');
   const day = state.day + 1;
   const map = new Map(state.map);
@@ -251,7 +259,7 @@ export const endDay = (state: GameState, rng?: RandomSource): GameState => {
     map.set(key, { ...cell, lastForagedDay: null, hasForagedToday: false });
   }
   next = { ...next, day, map, weather: state.weatherSchedule[day - 1] ?? Weather.SUNNY };
-  return log(next, `Day ${day}: ${next.weather.toLowerCase()} weather. Maintenance cost: ${maintenance} energy each day.`);
+  return log(next, `${next.weather.charAt(0) + next.weather.slice(1).toLowerCase()} weather. Plan your next foraging trip and rest before energy runs out.`);
 };
 
 /** Fictional game outputs informed by representative pollen requirements, not demographic predictions. */

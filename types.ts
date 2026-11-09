@@ -8,7 +8,6 @@ export interface SpeciesStats {
   name: SpeciesType; description: string; maxEnergy: number; energyCostMove: number;
   energyCostForage: number; forageEfficiency: number; pesticideResilience: number;
   maxToxicity: number; flightRange: number; traits: string[];
-  dailyMaintenance: number;
 }
 export interface HexCell {
   q: number; r: number; type: TerrainType; isRevealed: boolean;

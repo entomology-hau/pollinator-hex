@@ -4,51 +4,52 @@ export const HEX_SIZE = 30;
 export const MAP_RADIUS = 6;
 export const MAX_DAYS = 15;
 export const START_ENERGY = 100;
-export const MODEL_VERSION = '3.1';
-export const ENERGY_PER_RESOURCE = 4;
+export const MODEL_VERSION = '3.2';
+// Energy is a simple activity budget: feeding helps a little; rest restores stamina.
+export const ENERGY_PER_RESOURCE = 0.5;
+export const CROP_ENERGY_BONUS = 5;
+export const SHELTER_REST_RECOVERY = 30;
+export const OPEN_REST_RECOVERY = 15;
 // Simple gameplay conversion and habitat bonus; not measured physiological rates.
 export const HOVERFLY_RESOURCES_PER_EGG = 3;
 export const HOVERFLY_APHID_BONUS_MULTIPLIER = 1.5;
-export const RESOURCE_REGEN_DAYS = 1;
+export const RESOURCE_REGEN_DAYS = 3;
 
 export const SPECIES_DATA: Record<SpeciesType, SpeciesStats> = {
   [SpeciesType.BUMBLEBEE]: {
     name: SpeciesType.BUMBLEBEE,
-    description: "Gather pollen to support new workers. Harvest more per visit, but budget for costly flight and daily food needs.",
+    description: "Gather pollen to support new workers. Harvest more per visit, but leave enough energy for the flight home.",
     maxEnergy: 150,
-    energyCostMove: 7,
+    energyCostMove: 10,
     energyCostForage: 5,
     forageEfficiency: 1.5,
     pesticideResilience: 0.4,
     maxToxicity: 100,
     flightRange: 3,
-    dailyMaintenance: 12,
     traits: ["Colony Growth", "Efficient Foraging", "Costly Flight"]
   },
   [SpeciesType.SOLITARY_BEE]: {
     name: SpeciesType.SOLITARY_BEE,
     description: "Gather pollen to support offspring in nest cells. A short flight range makes nearby flowers valuable.",
     maxEnergy: 80,
-    energyCostMove: 4,
+    energyCostMove: 5,
     energyCostForage: 3,
     forageEfficiency: 1.2,
     pesticideResilience: 0.2,
     maxToxicity: 60,
     flightRange: 2,
-    dailyMaintenance: 8,
     traits: ["Nest Cells", "Lower Flight Cost", "Short Range"]
   },
   [SpeciesType.HOVERFLY]: {
     name: SpeciesType.HOVERFLY,
     description: "Gather floral resources to support egg production. Flowers near aphids give an automatic reproductive bonus.",
     maxEnergy: 100,
-    energyCostMove: 3,
+    energyCostMove: 4,
     energyCostForage: 4,
     forageEfficiency: 0.8,
     pesticideResilience: 0.75, // Illustrative exposure modifier, not a general taxonomic prediction
     maxToxicity: 30,
     flightRange: 4,
-    dailyMaintenance: 8,
     traits: ["Floral Resources", "Nearby Aphid Bonus", "Local Shelter"]
   }
 };

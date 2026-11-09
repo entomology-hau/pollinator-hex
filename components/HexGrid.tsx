@@ -44,6 +44,12 @@ export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
   const [previewKey, setPreviewKey] = useState(playerKey);
   const [focusedKey, setFocusedKey] = useState<string | null>(null);
   const cellsRef = useRef(new Map<string, SVGGElement>());
+  const revealFrameRef = useRef<number | null>(null);
+  const pointerFocusRef = useRef(false);
+
+  useEffect(() => () => {
+    if (revealFrameRef.current !== null) window.cancelAnimationFrame(revealFrameRef.current);
+  }, []);
 
   useEffect(() => {
     setTabStop(playerKey);
@@ -86,11 +92,33 @@ export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
     return parts.join('. ');
   };
 
-  const focusCell = (key: string) => {
+  const revealKeyboardFocus = (cell: SVGGElement) => {
+    if (revealFrameRef.current !== null) window.cancelAnimationFrame(revealFrameRef.current);
+    // Wait for focus scrolling and the current action text to finish laying out.
+    revealFrameRef.current = window.requestAnimationFrame(() => {
+      revealFrameRef.current = null;
+      if (document.activeElement !== cell) return;
+      const actions = document.querySelector<HTMLElement>('[data-game-actions]');
+      if (!actions) return;
+      const bar = actions.getBoundingClientRect();
+      const target = cell.getBoundingClientRect();
+      const overlapsHorizontally = target.right > bar.left && target.left < bar.right;
+      if (overlapsHorizontally && bar.bottom > 0 && target.top < bar.bottom + 8) {
+        window.scrollBy({ top: target.top - bar.bottom - 8, behavior: 'instant' });
+      }
+    });
+  };
+
+  const focusCell = (key: string, keyboard = true) => {
     if (!map.has(key)) return;
     setTabStop(key);
     setPreviewKey(key);
-    cellsRef.current.get(key)?.focus();
+    const cell = cellsRef.current.get(key);
+    if (!cell) return;
+    pointerFocusRef.current = !keyboard;
+    cell.focus();
+    pointerFocusRef.current = false;
+    if (keyboard) revealKeyboardFocus(cell);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<SVGGElement>, cell: HexCell) => {
@@ -106,6 +134,7 @@ export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
     } else if (key === 'Enter' || key === ' ') {
       event.preventDefault();
       if (getMovePreview(gameState, cell.q, cell.r).valid) onHexClick(cell.q, cell.r);
+      revealKeyboardFocus(event.currentTarget);
     }
   };
 
@@ -144,13 +173,16 @@ export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
               aria-disabled={!preview.valid}
               aria-current={isPlayer ? 'location' : undefined}
               data-coordinate={key}
-              onFocus={() => { setTabStop(key); setPreviewKey(key); setFocusedKey(key); }}
+              onFocus={event => {
+                setTabStop(key); setPreviewKey(key); setFocusedKey(key);
+                if (!pointerFocusRef.current && event.currentTarget.matches(':focus-visible')) revealKeyboardFocus(event.currentTarget);
+              }}
               onBlur={() => setFocusedKey(null)}
               onKeyDown={event => handleKeyDown(event, cell)}
               onMouseEnter={() => setPreviewKey(key)}
               onMouseLeave={() => setPreviewKey(tabStop)}
               onClick={() => {
-                focusCell(key);
+                focusCell(key, false);
                 if (preview.valid) onHexClick(cell.q, cell.r);
               }}
               className={preview.valid ? 'cursor-pointer outline-none' : 'cursor-default outline-none'}
