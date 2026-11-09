@@ -3,6 +3,7 @@ import { GameState, HexCell, TerrainType, SpeciesType } from '../types';
 import { MAX_DAYS, WEATHER_EFFECTS, TERRAIN_CONFIG, HOVERFLY_APHID_BONUS_MULTIPLIER } from '../constants';
 import { getReproductiveScore, hasNearbyAphids, isSafeShelter } from '../game/rules';
 import { Battery, CloudRain, Sun, Cloud, Flower, Skull, HelpCircle, LogOut } from 'lucide-react';
+import { formatEventForDisplay } from './formatEvent';
 
 interface Props {
   gameState: GameState;
@@ -50,7 +51,7 @@ export const HUD: React.FC<Props> = ({ gameState, currentHex, onOpenHelp, onExit
         <p className="text-sm text-slate-300 mt-2">{WEATHER_EFFECTS[weather].desc}</p>
       </section>
       <section className="bg-slate-900 border border-slate-700 p-4 rounded-xl" aria-labelledby="current-tile-title">
-        <h2 id="current-tile-title" className="font-bold mb-3">{terrainLabel} <span className="font-normal text-slate-400">({player.q}, {player.r})</span></h2>
+        <h2 id="current-tile-title" className="font-bold mb-3">{terrainLabel}</h2>
         <dl className="text-sm space-y-2">
           <div className="flex justify-between gap-3"><dt className="text-slate-300">Hazards</dt><dd className="text-right">{riskLabel}</dd></div>
           <div className="flex justify-between gap-3"><dt className="text-slate-300">Flowers</dt><dd className="text-right">{hasFlowers ? 'Present' : 'None'}</dd></div>
@@ -64,7 +65,7 @@ export const HUD: React.FC<Props> = ({ gameState, currentHex, onOpenHelp, onExit
       </section>
       <section className="rounded-xl border border-amber-700/70 bg-amber-950/20 p-4" aria-labelledby="feedback-heading">
         <h2 id="feedback-heading" className="text-sm font-bold text-amber-200 mb-2">Latest action</h2>
-        <div role="status" aria-live="polite" aria-atomic="true" className="text-sm text-slate-100 min-h-10"><p key={player.history.length}>{latest ? `Day ${latest.day}: ${latest.event}` : 'Choose a destination on the map.'}</p></div>
+        <div role="status" aria-live="polite" aria-atomic="true" className="text-sm text-slate-100 min-h-10"><p key={player.history.length}>{latest ? `Day ${latest.day}: ${formatEventForDisplay(latest.event)}` : 'Choose a destination on the map.'}</p></div>
       </section>
       <div className="flex flex-wrap gap-2">
         <button onClick={onOpenHelp} className="flex-1 min-w-28 flex items-center justify-center gap-2 p-3 rounded-lg border border-slate-500 hover:bg-slate-800 text-sm"><HelpCircle className="w-4 h-4" aria-hidden="true" />Field guide</button>

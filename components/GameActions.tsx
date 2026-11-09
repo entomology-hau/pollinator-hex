@@ -33,7 +33,7 @@ export const GameActions: React.FC<Props> = ({ gameState, currentHex, onForage, 
   return (
     <section aria-label="Foraging and rest actions" data-game-actions className="sticky top-2 z-20 rounded-xl border border-slate-600 bg-slate-900 p-3 shadow-lg shadow-slate-950/50 sm:p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm">
-        <p className="font-semibold text-slate-100">Day {day}/{MAX_DAYS} <span className="font-normal text-slate-300">· {terrainLabel} ({player.q}, {player.r})</span></p>
+        <p className="font-semibold text-slate-100">Day {day}/{MAX_DAYS} <span className="font-normal text-slate-300">· {terrainLabel}</span></p>
         <p className="flex items-center gap-1.5 font-mono text-emerald-200"><Battery className="h-4 w-4" aria-hidden="true" />Energy {formatEnergy(player.energy)}/{species.maxEnergy}</p>
       </div>
       <div className="grid grid-cols-2 gap-3">
