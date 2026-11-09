@@ -161,13 +161,35 @@ export const move = (state: GameState, q: number, r: number, rng?: RandomSource)
   return log(next, `Moved ${preview.distance} ${preview.distance === 1 ? 'hex' : 'hexes'} to (${q}, ${r}); flight cost ${preview.energyCost.toFixed(1)} energy.${collisionNote}${exposureNote}${waterNote}`);
 };
 
+export interface ForagePreview {
+  harvest: number;
+  creditedResources: number;
+  foodEnergy: number;
+  energyAfter: number;
+  energyChange: number;
+}
+
+/** Feeding and its action cost resolve together, before any pesticide effects. */
+export const getForagePreview = (state: GameState): ForagePreview | null => {
+  const species = state.species, cell = state.map.get(keyOf(state.player));
+  if (!isPlaying(state) || !species || !cell) return null;
+  if ([TerrainType.NEST, TerrainType.ROAD, TerrainType.WATER].includes(cell.type) || cell.resourceQuality <= 0) return null;
+  const impaired = state.player.toxicity > species.maxToxicity * 0.5;
+  const harvest = Math.floor(cell.resourceQuality * species.forageEfficiency * WEATHER_EFFECTS[state.weather].resourceMult * 0.1 * (impaired ? 0.75 : 1) * (cell.type === TerrainType.CROP ? 1.5 : 1));
+  const creditedResources = isHoverfly(state) && hasNearbyAphids(state)
+    ? Math.floor(harvest * HOVERFLY_APHID_BONUS_MULTIPLIER) : harvest;
+  const foodEnergy = harvest * ENERGY_PER_RESOURCE;
+  const energyAfter = clamp(state.player.energy + foodEnergy - species.energyCostForage, species.maxEnergy);
+  return { harvest, creditedResources, foodEnergy, energyAfter, energyChange: energyAfter - state.player.energy };
+};
+
 export const getForageBlockReason = (state: GameState): string | null => {
   if (!isPlaying(state)) return 'Start a simulation to forage.';
   const cell = state.map.get(keyOf(state.player));
   if (!cell) return 'No foraging tile is selected.';
   if ([TerrainType.NEST, TerrainType.ROAD, TerrainType.WATER].includes(cell.type) || cell.resourceQuality <= 0) return 'There are no floral resources on this tile.';
   if (cell.lastForagedDay !== null && state.day - cell.lastForagedDay < RESOURCE_REGENERATION_DAYS) return `Resources depleted. Available again on day ${cell.lastForagedDay + RESOURCE_REGENERATION_DAYS}.`;
-  if (state.player.energy < state.species!.energyCostForage) return `Too exhausted to forage: you need ${state.species!.energyCostForage} energy.`;
+  if (getForagePreview(state)!.energyAfter <= 0) return 'This patch cannot provide enough energy to forage safely. Find a richer flower patch.';
   return null;
 };
 export const canForage = (state: GameState): boolean => getForageBlockReason(state) === null;
@@ -182,12 +204,11 @@ export const forage = (state: GameState): GameState => {
   if (reason) return log(state, reason);
   const species = state.species!, cellKey = keyOf(state.player), cell = state.map.get(cellKey)!;
   const impaired = state.player.toxicity > species.maxToxicity * 0.5;
-  const amount = Math.floor(cell.resourceQuality * species.forageEfficiency * WEATHER_EFFECTS[state.weather].resourceMult * 0.1 * (impaired ? 0.75 : 1) * (cell.type === TerrainType.CROP ? 1.5 : 1));
+  const preview = getForagePreview(state)!;
+  const { harvest: amount, creditedResources: credited } = preview;
   const exposure = cell.pesticideLevel * 5 * (1 - species.pesticideResilience);
   const map = new Map(state.map);
   map.set(cellKey, { ...cell, lastForagedDay: state.day, hasForagedToday: true });
-  const hasHabitatBonus = isHoverfly(state) && hasNearbyAphids(state);
-  const credited = hasHabitatBonus ? Math.floor(amount * HOVERFLY_APHID_BONUS_MULTIPLIER) : amount;
   const next = {
     ...state, map,
     metrics: { ...state.metrics, forageVisits: state.metrics.forageVisits + 1,
@@ -195,13 +216,14 @@ export const forage = (state: GameState): GameState => {
       exposureEvents: state.metrics.exposureEvents + (exposure > 0 ? 1 : 0),
       toxicityAccumulated: state.metrics.toxicityAccumulated + exposure },
     player: { ...state.player,
-      energy: state.player.energy - species.energyCostForage + amount * ENERGY_PER_RESOURCE,
+      energy: preview.energyAfter,
       pollen: state.player.pollen + credited,
       toxicity: state.player.toxicity + exposure }
   };
   const resource = isHoverfly(state) ? `${amount} floral resource units` : `${amount * POLLEN_MG_PER_UNIT} mg pollen-equivalent`;
-  const bonusNote = hasHabitatBonus && credited > amount ? ` Nearby aphids add ${credited - amount} reproductive resource units: prey for future larvae, not food for the adult.` : '';
-  return finishIfDead(log(next, `Foraged ${resource}.${bonusNote} Food provides ${amount * ENERGY_PER_RESOURCE} energy; foraging costs ${species.energyCostForage}.${impaired ? ' Yield reduced by toxicity.' : ''}${exposure > 0 ? ` Exposure: +${exposure.toFixed(1)} toxicity.` : ''}`));
+  const bonusNote = credited > amount ? ` Nearby aphids add ${credited - amount} reproductive resource units: prey for future larvae, not food for the adult.` : '';
+  const energyNote = ` Energy ${preview.energyChange >= 0 ? '+' : ''}${preview.energyChange.toFixed(1)} after feeding and foraging costs (now ${preview.energyAfter.toFixed(1)}/${species.maxEnergy}).`;
+  return finishIfDead(log(next, `Foraged ${resource}.${bonusNote}${energyNote}${impaired ? ' Yield reduced by toxicity.' : ''}${exposure > 0 ? ` Exposure: +${exposure.toFixed(1)} toxicity.` : ''}`));
 };
 
 export const isSafeShelter = (state: GameState): boolean => {

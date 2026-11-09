@@ -3,7 +3,7 @@ import { X, Battery, Skull, Flower, Sun, Target, BookOpen } from 'lucide-react';
 import {
   BUMBLEBEE_POLLEN_PER_WORKER_MG, ENERGY_PER_RESOURCE, HOVERFLY_APHID_BONUS_MULTIPLIER,
   HOVERFLY_RESOURCES_PER_EGG, MAX_DAYS, MODEL_VERSION, POLLEN_MG_PER_UNIT,
-  RESOURCE_REGEN_DAYS, SOLITARY_POLLEN_PER_CELL_MG, SPECIES_DATA
+  SOLITARY_POLLEN_PER_CELL_MG, SPECIES_DATA
 } from '../constants';
 
 interface Props {
@@ -72,7 +72,7 @@ export const TutorialModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </p>
             <ol className="list-decimal space-y-2 pl-5">
               <li><strong>Move:</strong> select a reachable hex. Check the flight cost and known hazards.</li>
-              <li><strong>Forage:</strong> collect resources and recover feeding energy. Used flowers replenish after {RESOURCE_REGEN_DAYS} days.</li>
+              <li><strong>Forage:</strong> collect resources and recover energy. Use each flower patch once per day; it replenishes the next morning.</li>
               <li><strong>End day:</strong> find shelter and keep enough energy for daily maintenance. Resting does not feed you.</li>
             </ol>
           </section>
@@ -111,7 +111,8 @@ export const TutorialModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </h3>
             <p>
               Foraging supplies {ENERGY_PER_RESOURCE} energy per harvested resource unit, minus the action cost,
-              up to your energy capacity. Flying also costs energy. Ending every day consumes maintenance energy:
+              up to your energy capacity. The Forage preview shows how much energy you will actually recover.
+              Feed regularly, with an extra visit when reserves are low. Flying also costs energy. Ending every day consumes maintenance energy:
               {Object.values(SPECIES_DATA).map(species => ` ${species.name.toLowerCase()} ${species.dailyMaintenance}`).join(';')}.
               At zero energy the run ends.
             </p>
@@ -136,7 +137,7 @@ export const TutorialModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </p>
             <p className="flex items-start gap-2 text-blue-100">
               <Sun className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-              Rain doubles flight costs and reduces yield to 20%; cloud multiplies costs by 1.2 and yield by 0.8.
+              Rain increases flight costs by 50% and keeps 60% of usual yield; cloud increases costs by 20% and keeps 80% of yield.
               Check the day's weather before travelling.
             </p>
           </section>

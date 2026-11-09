@@ -10,7 +10,7 @@ All three pollinators use the same loop: **move → forage → end day**.
 
 1. Choose a scenario, control or treatment, a seed and a pollinator. Make a prediction.
 2. Fly to a reachable hex. The movement preview shows flight cost and known road hazards; unknown terrain stays hidden until explored.
-3. Forage on flowers to collect resources and recover energy. Gathered resources immediately contribute to reproductive output. Used patches replenish after three days.
+3. Forage on flowers to collect resources and recover energy. Gathered resources immediately contribute to reproductive output. Each patch can be used once per day and replenishes the next morning.
 4. End the day in suitable shelter where possible, keeping enough energy for maintenance.
 5. Report your pollinator, condition and final reproductive output on the class graph. Repeat the comparison with the same seed, then try additional seeds.
 
@@ -28,11 +28,11 @@ A single cumulative resource total drives each pollinator's output. Bee resource
 
 Foraging yield depends on patch quality, weather and species efficiency. Flowering crops retain the original 1.5× harvest multiplier. A hoverfly foraging on flowers gains 50% extra reproductive resource credit when aphids occupy the same hex or one of its six neighbours; the total credited harvest is rounded down. This automatic bonus represents nearby prey for future larvae. Adult hoverflies feed on flowers. The bonus does not increase feeding energy, and depleted flowers cannot award it again until they replenish.
 
-Foraging supplies four energy per actual harvested unit, minus the action cost, capped at the pollinator's energy capacity. Flying also costs energy. Ending every day, including the final day, consumes maintenance energy; zero energy ends the run. Shelter protects against night predation but does not restore energy. Exposed nights have a 15% predation risk.
+Foraging supplies four energy per actual harvested unit, minus the action cost, capped at the pollinator's energy capacity. The Forage preview shows the actual energy change after this cap. A living pollinator with very little energy can still feed if the food leaves it with positive energy. Base flight costs are 7 energy per hex for bumblebees, 4 for solitary bees and 3 for hoverflies. Ending every day, including the final day, consumes maintenance energy; zero energy ends the run. Shelter protects against night predation but does not restore energy. Exposed nights have a 15% predation risk.
 
 Every traversed road hex has a 25% collision chance, costing 35 energy. A lethal collision stops the flight at that road. Water supplies neither food nor detoxification. Landing on or feeding in an exposed patch adds toxicity. Above half the pollinator's toxicity limit, movement costs rise by 50% and yield falls by 25%; reaching the limit ends the run.
 
-Rain doubles movement costs and reduces resource yield to 20% of its sunny value. Cloudy weather multiplies costs by 1.2 and yield by 0.8. The seed fixes weather independently of actions and species.
+Rain increases movement costs by 50% and retains 60% of sunny resource yield. Cloudy weather multiplies costs by 1.2 and yield by 0.8. The seed fixes weather independently of actions and species. Feed regularly, check the next flight and overnight costs, and gather extra food when your reserves are low. Resting through every day without feeding still causes starvation.
 
 ## Class comparisons
 
@@ -50,11 +50,11 @@ The same seed, settings, pollinator and action sequence reproduce the same run. 
 
 Finished runs are saved locally in the current browser when storage is available, retaining up to 100 recent results. Export them for longer-term use or on shared computers. Summary CSVs retain model version, scenario, condition, seed, species, settings, survival, reproductive output, gathered resources and activity metrics. Action-history CSVs retain the event sequence.
 
-Exports include all saved results, independently of the comparison filters. Text is escaped for CSV and protected against spreadsheet formula interpretation. Saved settings preserve the meaning of older results. Compare only the same species, scenario and model version; model 2.0 provisioning/egg-laying results should not be pooled with model 3.0 resource-based results.
+Exports include all saved results, independently of the comparison filters. Text is escaped for CSV and protected against spreadsheet formula interpretation. Saved settings preserve the meaning of older results. Compare only the same species, scenario and model version. Model 3.1 changes energy balance and flower recovery; keep its results separate from model 3.0 and earlier runs.
 
 ## Model assumptions and evidence
 
-Model 3.0 represents reproductive health through resources gathered. Delivery, egg laying, development and offspring survival are folded into this simple teaching proxy. The outcomes describe support for future offspring, not adults emerging within the 15-day game or forecasts of population growth. Species traits, resource quality, energy, exposure, weather and hazards are game parameters. A game day is a turn rather than a literal daily activity budget. Habitat and management are represented separately; crops are not invariably exposed, and gardens are not invariably safe.
+Model 3.1 represents reproductive health through resources gathered. Delivery, egg laying, development and offspring survival are folded into this simple teaching proxy. The outcomes describe support for future offspring, not adults emerging within the 15-day game or forecasts of population growth. Species traits, resource quality, energy, exposure, weather and hazards are game parameters. A game day is a turn rather than a literal daily activity budget. Habitat and management are represented separately; crops are not invariably exposed, and gardens are not invariably safe.
 
 | Conversion | Evidence and interpretation |
 | --- | --- |
