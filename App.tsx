@@ -6,6 +6,7 @@ import { ScenarioSetup } from './components/ScenarioSetup';
 import { TrialHistory } from './components/TrialHistory';
 import { HexGrid } from './components/HexGrid';
 import { HUD } from './components/HUD';
+import { GameActions } from './components/GameActions';
 import { EventLog } from './components/EventLog';
 import { TutorialModal } from './components/TutorialModal';
 import { createInitialState, startGame, move, forage, endDay, getReproductiveScore } from './game/rules';
@@ -133,11 +134,13 @@ export default function App() {
           <p className="text-sm text-slate-200 break-words">{SCENARIOS[gameState.config.scenarioId].title} · {gameState.config.treatment === 'control' ? `Control: ${SCENARIOS[gameState.config.scenarioId].controlLabel}` : `Treatment: ${SCENARIOS[gameState.config.scenarioId].interventionLabel}`} · Seed <span className="font-mono">{gameState.config.seed}</span></p>
         </header>
         <div className="max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
-          <section aria-label="Landscape and movement" className="min-w-0"><HexGrid gameState={gameState} onHexClick={handleMove} />
+          <section aria-label="Landscape and movement" className="min-w-0 space-y-3">
+            <GameActions gameState={gameState} currentHex={gameState.map.get(`${gameState.player.q},${gameState.player.r}`)} onForage={handleForage} onRest={handleRest} />
+            <HexGrid gameState={gameState} onHexClick={handleMove} />
             <p className="rounded-lg border border-slate-700 bg-slate-900 p-4 mt-3 text-sm text-slate-300">Your experiment: {SCENARIOS[gameState.config.scenarioId].question}</p>
           </section>
-          <aside aria-label="Pollinator status and actions" className="min-w-0 space-y-4">
-            <HUD gameState={gameState} currentHex={gameState.map.get(`${gameState.player.q},${gameState.player.r}`)} onForage={handleForage} onRest={handleRest} onOpenHelp={() => setShowTutorial(true)} onExit={handleExit} />
+          <aside aria-label="Pollinator status and information" className="min-w-0 space-y-4">
+            <HUD gameState={gameState} currentHex={gameState.map.get(`${gameState.player.q},${gameState.player.r}`)} onOpenHelp={() => setShowTutorial(true)} onExit={handleExit} />
             <EventLog logs={gameState.player.history} />
           </aside>
         </div>

@@ -3,7 +3,8 @@ import { X, Battery, Skull, Flower, Sun, Target, BookOpen } from 'lucide-react';
 import {
   BUMBLEBEE_POLLEN_PER_WORKER_MG, ENERGY_PER_RESOURCE, HOVERFLY_APHID_BONUS_MULTIPLIER,
   HOVERFLY_RESOURCES_PER_EGG, MAX_DAYS, MODEL_VERSION, POLLEN_MG_PER_UNIT,
-  SOLITARY_POLLEN_PER_CELL_MG, SPECIES_DATA
+  SOLITARY_POLLEN_PER_CELL_MG, RESOURCE_REGEN_DAYS, CROP_ENERGY_BONUS,
+  SHELTER_REST_RECOVERY, OPEN_REST_RECOVERY
 } from '../constants';
 
 interface Props {
@@ -63,17 +64,17 @@ export const TutorialModal: React.FC<Props> = ({ isOpen, onClose }) => {
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4 text-sm leading-relaxed sm:p-6">
           <section className="space-y-3">
             <h3 className="flex items-center gap-2 text-lg font-bold text-white">
-              <Target className="h-5 w-5 text-emerald-300" aria-hidden="true" /> Move, forage, survive
+              <Target className="h-5 w-5 text-emerald-300" aria-hidden="true" /> Move, forage, rest
             </h3>
             <p id={descriptionId}>
               Gather resources through a {MAX_DAYS}-day season. Every pollinator uses the same three actions:
-              fly to a patch, forage on its flowers, then end the day when ready. Gathered resources
-              immediately contribute to reproductive output.
+              fly to a patch, forage on its flowers, then rest when ready. Gathered resources
+              immediately contribute to reproductive output; surviving alone is not the objective.
             </p>
             <ol className="list-decimal space-y-2 pl-5">
               <li><strong>Move:</strong> select a reachable hex. Check the flight cost and known hazards.</li>
-              <li><strong>Forage:</strong> collect resources and recover energy. Use each flower patch once per day; it replenishes the next morning.</li>
-              <li><strong>End day:</strong> find shelter and keep enough energy for daily maintenance. Resting does not feed you.</li>
+              <li><strong>Forage:</strong> collect resources for reproduction. Used flowers replenish after {RESOURCE_REGEN_DAYS} days.</li>
+              <li><strong>Rest:</strong> recover some energy and advance to tomorrow. Leave enough energy to reach shelter.</li>
             </ol>
           </section>
 
@@ -110,16 +111,15 @@ export const TutorialModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <Battery className="h-5 w-5 text-emerald-300" aria-hidden="true" /> Energy and shelter
             </h3>
             <p>
-              Foraging supplies {ENERGY_PER_RESOURCE} energy per harvested resource unit, minus the action cost,
-              up to your energy capacity. The Forage preview shows how much energy you will actually recover.
-              Feed regularly, with an extra visit when reserves are low. Flying also costs energy. Ending every day consumes maintenance energy:
-              {Object.values(SPECIES_DATA).map(species => ` ${species.name.toLowerCase()} ${species.dailyMaintenance}`).join(';')}.
-              At zero energy the run ends.
+              Energy is your activity budget. Flying uses it; foraging returns {ENERGY_PER_RESOURCE} energy per harvested unit,
+              with {CROP_ENERGY_BONUS} extra on flowering crops, minus the action cost. The Forage preview shows the net change,
+              which can be a small cost. At zero energy the run ends through exhaustion.
             </p>
             <p>
               Bees shelter at the central nest. Hoverflies can also shelter in woodland and urban gardens.
-              An exposed night has a 15% predation risk. Moving and foraging do not advance the day;
-              plan ahead for depleted patches and tonight's energy needs.
+              Rest restores up to {SHELTER_REST_RECOVERY} energy in shelter or {OPEN_REST_RECOVERY} in the open and advances the day.
+              An exposed night has a 15% predation risk. Moving and foraging do not advance the day.
+              Balance another foraging visit against the trip home. Resting without foraging earns no reproductive output.
             </p>
           </section>
 

@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { MAX_DAYS, RESOURCE_REGEN_DAYS, SPECIES_DATA, WEATHER_EFFECTS } from '../constants';
+import { CROP_ENERGY_BONUS, ENERGY_PER_RESOURCE, MAX_DAYS, OPEN_REST_RECOVERY, RESOURCE_REGEN_DAYS, SHELTER_REST_RECOVERY, SPECIES_DATA, WEATHER_EFFECTS } from '../constants';
 import { DEFAULT_CONFIG } from '../game/scenarios';
 import { GameState, HexCell, SpeciesType, TerrainType, Weather } from '../types';
 import {
   canForage, createInitialState, createMap, endDay, estimateMoveCost, forage,
   getForageBlockReason, getMovePreview, hexDistance, move, startGame, traceHexPath,
-  getReproductiveScore, hasNearbyAphids, isSafeShelter, getForagePreview, ROAD_COLLISION_ENERGY_LOSS
+  getReproductiveScore, hasNearbyAphids, isSafeShelter, getForagePreview, getRestPreview, ROAD_COLLISION_ENERGY_LOSS
 } from '../game/rules';
 
 const tile = (q: number, r: number, type = TerrainType.MEADOW, overrides: Partial<HexCell> = {}): HexCell => ({
@@ -124,7 +124,7 @@ test('preview energy cost matches weather and impairment and exact exhaustion en
   const result = move(initial, 1, 0, safe);
   assert.equal(result.status, 'GAME_OVER');
   assert.equal(result.player.energy, 0);
-  assert.equal(result.player.deathReason, 'Starvation');
+  assert.equal(result.player.deathReason, 'Exhaustion');
   const fractional = scenario([tile(0, 0), tile(1, 0), tile(2, 0), tile(3, 0)], SpeciesType.HOVERFLY);
   fractional.weather = Weather.CLOUDY;
   fractional.player.energy = getMovePreview(fractional, 3, 0).energyCost;
@@ -174,9 +174,9 @@ test('foraging obeys terrain and safe feeding restrictions in the engine, not ju
   assert.equal(forage(poorPatch).metrics.forageVisits, 0);
 });
 
-test('hungry pollinators can recover from flowers without an upfront energy requirement', () => {
+test('low-energy pollinators can feed when the combined food and action cost leaves positive energy', () => {
   for (const species of Object.values(SpeciesType)) {
-    const hungry = scenario([tile(0, 0)], species);
+    const hungry = scenario([tile(0, 0, TerrainType.CROP)], species);
     hungry.player.energy = 1;
     const preview = getForagePreview(hungry)!;
     assert.ok(hungry.player.energy < hungry.species!.energyCostForage);
@@ -220,13 +220,30 @@ test('forage previews separate aphid credit from food and account for toxicity i
   const normal = getForagePreview(plain)!;
   const bonus = getForagePreview(nearAphids)!;
   assert.equal(normal.harvest, 5);
-  assert.equal(normal.foodEnergy, 20);
-  assert.equal(normal.energyAfter, 56);
+  assert.equal(normal.foodEnergy, 5 * ENERGY_PER_RESOURCE + CROP_ENERGY_BONUS);
+  assert.equal(normal.energyAfter, 43.5);
   assert.equal(bonus.harvest, normal.harvest);
   assert.equal(bonus.foodEnergy, normal.foodEnergy);
   assert.equal(bonus.energyAfter, normal.energyAfter);
   assert.equal(bonus.creditedResources, 7);
   assert.equal(forage(nearAphids).player.energy, bonus.energyAfter);
+});
+
+test('ordinary flowers give only a small energy return while crops retain their automatic food bonus', () => {
+  for (const [species, meadowChange, cropChange] of [
+    [SpeciesType.BUMBLEBEE, 1, 9],
+    [SpeciesType.SOLITARY_BEE, 1.5, 9],
+    [SpeciesType.HOVERFLY, -1, 5.5],
+  ] as const) {
+    const meadow = scenario([tile(0, 0)], species);
+    meadow.player.energy = 40;
+    const crop = { ...meadow, map: new Map([['0,0', tile(0, 0, TerrainType.CROP)]]) };
+    assert.equal(getForagePreview(meadow)!.energyChange, meadowChange);
+    assert.equal(getForagePreview(crop)!.energyChange, cropChange);
+    assert.equal(forage(meadow).player.energy, 40 + meadowChange);
+    assert.equal(forage(crop).player.energy, 40 + cropChange);
+    assert.ok(meadowChange < meadow.species!.energyCostMove, 'meadow feeding cannot finance another flight');
+  }
 });
 
 test('foraging and movement toxicity deaths clamp to species threshold', () => {
@@ -240,28 +257,60 @@ test('foraging and movement toxicity deaths clamp to species threshold', () => {
   }
 });
 
-test('end of day charges maintenance in every habitat and processes night mortality', () => {
-  const nest = scenario([tile(0, 0, TerrainType.NEST)]);
-  nest.player.energy = 130;
-  assert.equal(endDay(nest, safe).player.energy, 130 - SPECIES_DATA[SpeciesType.BUMBLEBEE].dailyMaintenance);
-  const outside = scenario([tile(0, 0, TerrainType.NEST), tile(1, 0)]);
-  outside.player.q = 1;
-  outside.player.energy = 100;
-  assert.equal(endDay(outside, safe).player.energy, 100 - SPECIES_DATA[SpeciesType.BUMBLEBEE].dailyMaintenance);
+test('rest restores activity energy with shelter and capacity limits, without spending or collecting resources', () => {
+  for (const species of Object.values(SpeciesType)) {
+    for (const terrain of [TerrainType.NEST, TerrainType.MEADOW]) {
+      for (const energy of [1, SPECIES_DATA[species].maxEnergy - 2, SPECIES_DATA[species].maxEnergy]) {
+        const initial = scenario([tile(0, 0, terrain)], species);
+        initial.player.energy = energy;
+        initial.player.pollen = 9;
+        initial.metrics.energySpent = 13;
+        const preview = getRestPreview(initial)!;
+        const recovery = terrain === TerrainType.NEST ? SHELTER_REST_RECOVERY : OPEN_REST_RECOVERY;
+        assert.equal(preview.sheltered, terrain === TerrainType.NEST);
+        assert.equal(preview.energyAfter, Math.min(SPECIES_DATA[species].maxEnergy, energy + recovery));
+        assert.equal(preview.energyChange, preview.energyAfter - energy);
+        const rested = endDay(initial, safe);
+        assert.equal(rested.player.energy, preview.energyAfter);
+        assert.equal(rested.metrics.energySpent, 13);
+        assert.equal(rested.player.pollen, 9);
+        assert.equal(rested.metrics.completedDays, 1);
+        assert.equal(rested.day, 2);
+        assert.equal(initial.player.energy, energy, 'rest must not mutate the prior state');
+        assert.ok(rested.player.history.some(entry => entry.event.includes(`Recovered ${preview.energyChange.toFixed(1)} energy`)));
+      }
+    }
+  }
+  assert.equal(getRestPreview(createInitialState()), null);
+});
+
+test('night predation is resolved before any recovery or completed day is awarded', () => {
+  const outside = scenario([tile(0, 0, TerrainType.MEADOW)]);
+  outside.player.energy = 1;
+  outside.metrics.energySpent = 21;
+  outside.player.pollen = 12;
   const death = endDay(outside, () => 0.01);
   assert.equal(death.status, 'GAME_OVER');
   assert.equal(death.player.deathReason, 'Predation during night');
   assert.equal(death.player.energy, 0);
+  assert.equal(death.metrics.energySpent, 21);
+  assert.equal(death.metrics.completedDays, 0);
+  assert.equal(death.player.pollen, 12);
+  assert.ok(!death.player.history.some(entry => entry.event.includes('Recovered')));
+  assert.equal(getRestPreview(death), null);
+  assert.equal(endDay(death, safe), death, 'rest cannot revive a dead pollinator');
 });
 
-test('all idle pollinators starve before completing the season, including at shelter', () => {
+test('resting at the nest can finish the season but produces no reproductive output', () => {
   for (const species of Object.values(SpeciesType)) {
     let state = scenario([tile(0, 0, TerrainType.NEST)], species);
     for (let day = 1; day <= MAX_DAYS; day++) state = endDay(state, safe);
     assert.equal(state.status, 'GAME_OVER');
-    assert.equal(state.player.isAlive, false);
-    assert.equal(state.player.deathReason, 'Starvation');
-    assert.ok(state.metrics.completedDays < MAX_DAYS);
+    assert.equal(state.player.isAlive, true);
+    assert.equal(state.player.deathReason, undefined);
+    assert.equal(state.metrics.completedDays, MAX_DAYS);
+    assert.equal(state.player.energy, state.species!.maxEnergy);
+    assert.equal(state.metrics.energySpent, 0);
     assert.equal(getReproductiveScore(state).score, 0);
     assert.equal(move(state, 1, 0, safe), state);
     assert.equal(forage(state), state);
@@ -269,7 +318,7 @@ test('all idle pollinators starve before completing the season, including at she
   }
 });
 
-test('a fed survivor pays final-day maintenance before completing day 15', () => {
+test('a surviving final-day rest restores energy before completing day 15', () => {
   const state = scenario([tile(0, 0, TerrainType.NEST)]);
   state.day = MAX_DAYS;
   state.metrics.completedDays = MAX_DAYS - 1;
@@ -278,7 +327,7 @@ test('a fed survivor pays final-day maintenance before completing day 15', () =>
   assert.equal(result.status, 'GAME_OVER');
   assert.equal(result.player.isAlive, true);
   assert.equal(result.metrics.completedDays, MAX_DAYS);
-  assert.equal(result.player.energy, 20 - state.species!.dailyMaintenance);
+  assert.equal(result.player.energy, 20 + SHELTER_REST_RECOVERY);
 });
 
 test('bees gain reproductive output from foraging immediately without a nest delivery', () => {
@@ -341,7 +390,7 @@ test('hoverfly feeding supports eggs automatically from cumulative resources', (
   const fed = forage(state);
   assert.equal(fed.player.pollen, 8);
   assert.deepEqual(getReproductiveScore(fed), { score: 2, label: 'Eggs supported' });
-  assert.equal(fed.player.energy, 100);
+  assert.equal(fed.player.energy, 99);
   assert.equal(fed.day, 1);
 });
 
@@ -358,7 +407,7 @@ test('hoverfly habitat bonus applies on the same or each adjacent aphid hex, not
     const fed = forage(state);
     assert.equal(fed.player.pollen, adjacent ? 9 : 6);
     assert.equal(getReproductiveScore(fed).score, adjacent ? 3 : 2);
-    assert.equal(fed.player.energy, 60, 'habitat bonus does not create extra adult food energy');
+    assert.equal(fed.player.energy, 39, 'habitat bonus does not create extra adult food energy');
     assert.equal(state.player.pollen, 0);
   }
 });
@@ -388,7 +437,7 @@ test('hoverfly bonus is rounded from the actual harvest after weather and toxici
   // floor(80 × .8 × .8 × .1 × .75 × 1.5) = 5 food units; floor(5 × 1.5) = 7 credited units.
   const fed = forage(state);
   assert.equal(fed.player.pollen, 7);
-  assert.equal(fed.player.energy, 56);
+  assert.equal(fed.player.energy, 43.5);
   assert.equal(getReproductiveScore(fed).score, 2);
 });
 

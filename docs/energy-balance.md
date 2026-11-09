@@ -1,25 +1,45 @@
 # Energy balance checks
 
-Model 3.1 makes regular feeding a viable way to complete the 15-day season. Daily maintenance remains 12, 8 and 8 energy for bumblebees, solitary bees and hoverflies. Base flight costs are now 7, 4 and 3 per hex; rain increases these by 50% and retains 60% of floral yield. Flowers replenish each new day.
+Model 3.2 returns to the original activity-and-rest loop. The main objective is reproductive output. Energy limits how much collecting and travelling a pollinator can do before it needs to rest; survival alone is not a high score.
 
-## Simple classroom routine
+## Balance changes
 
-Each day, alternate between the visible, pesticide-free starter meadow `(0, -1)` and garden `(1, -1)`, forage once, return to the nest and end the day. There is no exploration, route optimisation or use of hidden information. Both patches are adjacent to the nest and available in every scenario.
-
-The comparison used `hau-ecology-01` plus `class-energy-1` through `class-energy-199`. In model 3.0, depleted patches were skipped until available; all other choices stayed the same. Baseline figures use the flower-strips control condition.
-
-| Pollinator | Model 3.0: completed 15 days | Model 3.1: completed 15 days | Default-seed energy after day 15 |
+| Parameter | Original game | Model 3.1 | Model 3.2 |
 | --- | ---: | ---: | ---: |
-| Bumblebee | 12 / 200 | 200 / 200 | 129.6 / 150 |
-| Solitary bee | 49 / 200 | 200 / 200 | 67.2 / 80 |
-| Hoverfly | 39 / 200 | 200 / 200 | 68.2 / 100 |
+| Bumblebee / solitary bee / hoverfly flight cost per hex | 10 / 5 / 4 | 7 / 4 / 3 | 10 / 5 / 4 |
+| Feeding energy per harvested resource | 0.5 | 4 | 0.5 |
+| Additional feeding energy in flowering crops | 5 | 0 | 5 |
+| Sheltered overnight change | +40 | −12 / −8 / −8 | +30 |
+| Exposed overnight change, if survived | +20 | −12 / −8 / −8 | +15 |
+| Days before a used patch recovers | 3 | 1 | 3 |
+| Rain: flight multiplier / resource multiplier | 2 / 0.2 | 1.5 / 0.6 | 1.5 / 0.6 |
 
-Repeating the model 3.1 routine across all three scenarios and both conditions produced 3,600 completed seasons out of 3,600 runs. A second strategy—choose the highest-quality visible, pesticide-free flower adjacent to the nest each day—also completed all 3,600 runs. These are checks of two safe feeding strategies, not estimates of student success rates: both avoid roads, pesticide exposure and exposed nights.
+Recovery is capped at the pollinator's maximum energy. The original water-energy loophole and adult-hoverfly aphid-feeding claim remain removed. The aphid habitat bonus only affects reproductive resources.
 
-Weather still reduces reserves. In the alternating routine, the lowest final energy across the 200 seeds was 19.0 for bumblebees, 45.4 for solitary bees and 7.0 for hoverflies. Two adjacent flower visits per day also sustain all three pollinators through a deliberately all-rain season. Foraging twice can therefore compensate for poor weather without adding an action type.
+On a sunny 80-quality meadow, a bumblebee harvests 12 resources. Model 3.1 gave 43 net energy from that forage before the capacity limit. Model 3.2 gives 1. Flying to another meadow and collecting there therefore spends reserves rather than repeatedly refilling them.
 
-Doing nothing at the nest still causes starvation on day 13 for bumblebees and hoverflies, and day 10 for solitary bees.
+Flowering crops retain their original small energy bonus and high harvest. Rich crops can offset a short flight, particularly for hoverflies; they are not an unlimited energy source because collection depletes each patch for three days, and exposed crops may accumulate toxicity.
 
-## Regression checks
+## Behaviour checks
 
-Run `node --import tsx --test tests/energy-balance.test.ts`. The tests exercise the alternating routine with the default seed and 19 named seeds, across every scenario and condition, and the all-rain two-visit routine. To reproduce the wider 200-seed sweep, increase the seed-list length from 19 to 199 in a temporary test copy. Existing rules tests cover starvation without feeding, resource limits, weather, hazards and reproduction.
+The checks now distinguish cautious, productive and inactive play instead of treating universal survival as the balance target.
+
+A controlled sunny route visits six connected 80-quality meadows, then returns six hexes to the nest. It isolates energy from roads, pesticides and night risk.
+
+| Pollinator | Starting energy | After collecting six flowers | After returning home | After one sheltered rest |
+| --- | ---: | ---: | ---: | ---: |
+| Bumblebee | 150 | 96 | 36 | 66 |
+| Solitary bee | 80 | 59 | 29 | 59 |
+| Hoverfly | 100 | 70 | 46 | 76 |
+
+Every move-and-forage step on this route reduces energy. Extra return travel earns no resources, and one night's recovery does not erase the cost of the long trip. A player must choose between another collecting trip and spending a turn recovering.
+
+A cautious routine visits the two visible, pesticide-free flowers beside the nest whenever they have recovered, then returns to shelter. On other days it rests. Across the default seed plus 19 named seeds, every species and every scenario/condition combination completes the 15-day season. The routine makes only ten forage visits because of the three-day recovery interval. It demonstrates that sensible play remains viable, not an expected success rate for students.
+
+A pollinator that rests at the nest for the entire season survives but collects no resources and gains no reproductive output. Survival without collecting is therefore not equivalent to success.
+
+## Reproduction and reproducibility
+
+Resource-to-offspring conversions and the hoverfly aphid bonus are unchanged. Keep model 3.2 results separate from earlier versions when comparing class outputs.
+
+Run `node --import tsx --test tests/energy-balance.test.ts`. The six tests cover the bounded collecting route and cautious versus inactive seasons. Existing rules tests separately cover rest capacity limits, exposed-night risks, crop feeding, flower recovery, depletion, exhaustion, hazards and reproductive conversions.
