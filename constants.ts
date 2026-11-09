@@ -4,19 +4,19 @@ export const HEX_SIZE = 30;
 export const MAP_RADIUS = 6;
 export const MAX_DAYS = 15;
 export const START_ENERGY = 100;
-export const MODEL_VERSION = '3.0';
+export const MODEL_VERSION = '3.1';
 export const ENERGY_PER_RESOURCE = 4;
 // Simple gameplay conversion and habitat bonus; not measured physiological rates.
 export const HOVERFLY_RESOURCES_PER_EGG = 3;
 export const HOVERFLY_APHID_BONUS_MULTIPLIER = 1.5;
-export const RESOURCE_REGEN_DAYS = 3;
+export const RESOURCE_REGEN_DAYS = 1;
 
 export const SPECIES_DATA: Record<SpeciesType, SpeciesStats> = {
   [SpeciesType.BUMBLEBEE]: {
     name: SpeciesType.BUMBLEBEE,
     description: "Gather pollen to support new workers. Harvest more per visit, but budget for costly flight and daily food needs.",
     maxEnergy: 150,
-    energyCostMove: 10,
+    energyCostMove: 7,
     energyCostForage: 5,
     forageEfficiency: 1.5,
     pesticideResilience: 0.4,
@@ -29,7 +29,7 @@ export const SPECIES_DATA: Record<SpeciesType, SpeciesStats> = {
     name: SpeciesType.SOLITARY_BEE,
     description: "Gather pollen to support offspring in nest cells. A short flight range makes nearby flowers valuable.",
     maxEnergy: 80,
-    energyCostMove: 5,
+    energyCostMove: 4,
     energyCostForage: 3,
     forageEfficiency: 1.2,
     pesticideResilience: 0.2,
@@ -42,7 +42,7 @@ export const SPECIES_DATA: Record<SpeciesType, SpeciesStats> = {
     name: SpeciesType.HOVERFLY,
     description: "Gather floral resources to support egg production. Flowers near aphids give an automatic reproductive bonus.",
     maxEnergy: 100,
-    energyCostMove: 4,
+    energyCostMove: 3,
     energyCostForage: 4,
     forageEfficiency: 0.8,
     pesticideResilience: 0.75, // Illustrative exposure modifier, not a general taxonomic prediction
@@ -65,7 +65,7 @@ export const TERRAIN_CONFIG: Record<TerrainType, { color: string, label: string,
 
 export const WEATHER_EFFECTS: Record<Weather, { moveCostMult: number, resourceMult: number, desc: string }> = {
   [Weather.SUNNY]: { moveCostMult: 1, resourceMult: 1, desc: 'Ideal conditions.' },
-  [Weather.RAINY]: { moveCostMult: 2, resourceMult: 0.2, desc: 'Higher flight costs, lower resource yield.' },
+  [Weather.RAINY]: { moveCostMult: 1.5, resourceMult: 0.6, desc: 'Flight costs 50% more; flowers yield 60% of their usual resources.' },
   [Weather.CLOUDY]: { moveCostMult: 1.2, resourceMult: 0.8, desc: 'Slightly higher flight costs and lower yield.' }
 };
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { GameState, HexCell, TerrainType, SpeciesType } from '../types';
 import { MAX_DAYS, WEATHER_EFFECTS, TERRAIN_CONFIG, HOVERFLY_APHID_BONUS_MULTIPLIER } from '../constants';
-import { getForageBlockReason, getReproductiveScore, hasNearbyAphids, isSafeShelter } from '../game/rules';
+import { getForageBlockReason, getForagePreview, getReproductiveScore, hasNearbyAphids, isSafeShelter } from '../game/rules';
 import { Battery, CloudRain, Sun, Cloud, Flower, Skull, HelpCircle, LogOut } from 'lucide-react';
 
 interface Props {
@@ -20,6 +20,7 @@ export const HUD: React.FC<Props> = ({ gameState, currentHex, onForage, onRest, 
   const terrain = TERRAIN_CONFIG[currentHex.type];
   const terrainLabel = currentHex.flowerStrip ? 'Flower strip' : currentHex.type === TerrainType.MEADOW && currentHex.resourceQuality === 0 ? 'Unflowering meadow' : terrain.label;
   const blockedReason = getForageBlockReason(gameState);
+  const foragePreview = getForagePreview(gameState);
   const hasFlowers = currentHex.resourceQuality > 0 && ![TerrainType.NEST, TerrainType.WATER, TerrainType.ROAD].includes(currentHex.type);
   const isHoverfly = species.name === SpeciesType.HOVERFLY;
   const aphidBonus = isHoverfly && hasFlowers && hasNearbyAphids(gameState);
@@ -28,6 +29,20 @@ export const HUD: React.FC<Props> = ({ gameState, currentHex, onForage, onRest, 
   const impaired = player.toxicity > species.maxToxicity * 0.5;
   const latest = player.history[player.history.length - 1];
   const riskLabel = currentHex.type === TerrainType.ROAD ? 'Road collision risk' : currentHex.pesticideLevel > 0 ? 'Pesticide exposure' : 'No pesticide exposure';
+  const formatEnergy = (value: number) => value.toFixed(1).replace(/\.0$/, '');
+  const forageEnergy = foragePreview && (
+    foragePreview.energyChange > 0
+      ? `Recover ${formatEnergy(foragePreview.energyChange)} energy (to ${formatEnergy(foragePreview.energyAfter)}/${species.maxEnergy}).`
+      : foragePreview.energyChange < 0
+        ? `Uses ${formatEnergy(-foragePreview.energyChange)} energy (leaving ${formatEnergy(foragePreview.energyAfter)}/${species.maxEnergy}).`
+        : player.energy >= species.maxEnergy
+          ? 'Energy already full.'
+          : `Energy stays at ${formatEnergy(foragePreview.energyAfter)}/${species.maxEnergy}.`
+  );
+  const forageExplanation = foragePreview
+    ? `${forageEnergy} Gather ${foragePreview.creditedResources} ${isHoverfly ? 'resource units' : 'mg pollen-equivalent'}.`
+    : '';
+  const overnightEnergy = Math.max(0, player.energy - species.dailyMaintenance);
   return (
     <>
       <section className="bg-slate-900 border border-slate-700 p-4 rounded-xl" aria-labelledby="status-title">
@@ -63,12 +78,12 @@ export const HUD: React.FC<Props> = ({ gameState, currentHex, onForage, onRest, 
           <div className="flex justify-between gap-3"><dt className="text-slate-300">Aphid patch</dt><dd>{currentHex.aphids ? 'Present' : 'Absent'}</dd></div>
           <div className="flex justify-between gap-3"><dt className="text-slate-300">Night shelter</dt><dd>{sheltered ? 'Safe for this pollinator' : 'Exposed'}</dd></div>
         </dl>
-        {aphidBonus && <p className="text-sm text-pink-200 mt-3">Aphid bonus: +{Math.round((HOVERFLY_APHID_BONUS_MULTIPLIER - 1) * 100)}% resource credit when you forage here. Nearby aphids provide food for future larvae.</p>}
+        {aphidBonus && <p className="text-sm text-pink-200 mt-3">Aphid bonus: +{Math.round((HOVERFLY_APHID_BONUS_MULTIPLIER - 1) * 100)}% resource credit. Nearby aphids support future larvae; the bonus adds no food energy.</p>}
         <div className="mt-4 flex flex-col gap-3">
           <button onClick={onForage} disabled={Boolean(blockedReason)} aria-describedby="forage-explanation" className="w-full rounded-lg px-3 py-3 font-bold bg-amber-400 hover:bg-amber-300 text-slate-950 disabled:bg-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed flex justify-center items-center gap-2"><Flower className="w-5 h-5" aria-hidden="true" />Forage</button>
-          <p id="forage-explanation" className="text-sm text-slate-300">{blockedReason || `Gather resources and recover energy from flowers. Foraging costs ${species.energyCostForage} energy.`}</p>
+          <p id="forage-explanation" className="text-sm text-slate-300">{blockedReason || forageExplanation}</p>
           <button onClick={onRest} className="w-full rounded-lg px-3 py-3 font-bold bg-emerald-700 hover:bg-emerald-600 text-white">{sheltered ? 'End day in shelter' : 'End day in the open'}</button>
-          <p className={`text-xs ${player.energy <= species.dailyMaintenance ? 'text-red-300' : 'text-slate-300'}`}>{player.energy <= species.dailyMaintenance ? 'You do not have enough energy to survive daily maintenance. Find food before ending the day.' : `Ending the day uses ${species.dailyMaintenance} energy; resting does not feed you. ${sheltered ? 'This location protects you from night-time predation.' : 'There is a 15% risk of night-time predation here.'}`}</p>
+          <p className={`text-xs ${player.energy <= species.dailyMaintenance ? 'text-red-300' : 'text-slate-300'}`}>{player.energy <= species.dailyMaintenance ? 'After tonight: 0 energy. You do not have enough energy to survive daily maintenance. Find food before ending the day.' : `After tonight: ${formatEnergy(overnightEnergy)} energy (${species.dailyMaintenance} used). ${sheltered ? 'Shelter protects you from night-time predation.' : 'There is a 15% risk of night-time predation here.'}`}</p>
         </div>
       </section>
       <section className="rounded-xl border border-amber-700/70 bg-amber-950/20 p-4" aria-labelledby="feedback-heading">

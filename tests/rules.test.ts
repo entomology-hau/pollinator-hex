@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { MAX_DAYS, SPECIES_DATA } from '../constants';
+import { MAX_DAYS, RESOURCE_REGEN_DAYS, SPECIES_DATA, WEATHER_EFFECTS } from '../constants';
 import { DEFAULT_CONFIG } from '../game/scenarios';
 import { GameState, HexCell, SpeciesType, TerrainType, Weather } from '../types';
 import {
   canForage, createInitialState, createMap, endDay, estimateMoveCost, forage,
   getForageBlockReason, getMovePreview, hexDistance, move, startGame, traceHexPath,
-  getReproductiveScore, hasNearbyAphids, isSafeShelter
+  getReproductiveScore, hasNearbyAphids, isSafeShelter, getForagePreview, ROAD_COLLISION_ENERGY_LOSS
 } from '../game/rules';
 
 const tile = (q: number, r: number, type = TerrainType.MEADOW, overrides: Partial<HexCell> = {}): HexCell => ({
@@ -48,12 +48,12 @@ test('road danger applies to intermediate tiles, consistently for direct and spl
   const preview = getMovePreview(initial, 2, 0);
   assert.equal(preview.valid, true);
   assert.equal(preview.roadCrossings, 1);
-  assert.equal(preview.energyCost, 20);
+  assert.equal(preview.energyCost, 2 * initial.species!.energyCostMove);
   let draws = 0;
   const direct = move(initial, 2, 0, () => { draws++; return 0; });
   const split = move(move(initial, 1, 0, () => 0), 2, 0, () => 0);
   assert.equal(draws, 1);
-  assert.equal(direct.player.energy, 95);
+  assert.equal(direct.player.energy, 150 - preview.energyCost - ROAD_COLLISION_ENERGY_LOSS);
   assert.equal(direct.player.energy, split.player.energy);
   assert.equal(direct.player.q, 2);
   assert.match(direct.player.history.at(-1)!.event, /collision/);
@@ -65,7 +65,7 @@ test('each crossed road is checked, but leaving an origin road does not repeat i
   let draws = 0;
   const result = move(initial, 3, 0, () => { draws++; return 0.9; });
   assert.equal(draws, 2);
-  assert.equal(result.player.energy, 120);
+  assert.equal(result.player.energy, 150 - 3 * initial.species!.energyCostMove);
 });
 
 test('lethal intermediate collision stops on the road and clamps energy to zero', () => {
@@ -92,20 +92,20 @@ test('water cycling spends energy, provides no detoxification and cannot be fora
     assert.match(attempted.player.history.at(-1)!.event, /no floral resources/);
     state = move(state, 0, 0, safe);
   }
-  assert.equal(state.player.energy, 58);
+  assert.equal(state.player.energy, 90 - 8 * state.species!.energyCostMove);
   assert.equal(state.player.toxicity, 10);
   assert.equal(state.day, 1);
 });
 
 test('invalid, zero-distance, missing-route, unaffordable and out-of-range moves leave position and resources intact', () => {
   const initial = scenario([tile(0, 0), tile(1, 0), tile(2, 0), tile(4, 0)]);
-  initial.player.energy = 15;
+  initial.player.energy = initial.species!.energyCostMove * 1.5;
   for (const [q, r] of [[0, 0], [2, 0], [4, 0], [99, 99], [0.5, 0], [NaN, 0]]) {
     assert.equal(getMovePreview(initial, q, r).valid, false);
     const result = move(initial, q, r, () => { throw new Error('invalid move must not draw randomness'); });
     assert.equal(result.player.q, 0);
     assert.equal(result.player.r, 0);
-    assert.equal(result.player.energy, 15);
+    assert.equal(result.player.energy, initial.player.energy);
     assert.equal(result.map, initial.map);
     assert.equal(result.player.history.length, 1);
   }
@@ -117,9 +117,10 @@ test('preview energy cost matches weather and impairment and exact exhaustion en
   const initial = scenario([tile(0, 0), tile(1, 0)]);
   initial.weather = Weather.RAINY;
   initial.player.toxicity = 51;
-  initial.player.energy = 30;
-  assert.equal(estimateMoveCost(initial, 1), 30);
-  assert.equal(getMovePreview(initial, 1, 0).energyCost, 30);
+  const expectedCost = initial.species!.energyCostMove * WEATHER_EFFECTS[Weather.RAINY].moveCostMult * 1.5;
+  initial.player.energy = expectedCost;
+  assert.equal(estimateMoveCost(initial, 1), expectedCost);
+  assert.equal(getMovePreview(initial, 1, 0).energyCost, expectedCost);
   const result = move(initial, 1, 0, safe);
   assert.equal(result.status, 'GAME_OVER');
   assert.equal(result.player.energy, 0);
@@ -141,35 +142,91 @@ test('hoverfly crop feeding awards floral resources only and no aphid predation 
   assert.equal(initial.map.get('0,0')!.lastForagedDay, null);
 });
 
-test('depleted floral resources remain unavailable until three days have elapsed', () => {
+test('a patch cannot be foraged again until its renewal day', () => {
   const initial = scenario([tile(0, 0)]);
   const first = forage(initial);
   assert.equal(first.player.pollen, 12);
   assert.equal(canForage(first), false);
-  assert.match(getForageBlockReason(first)!, /day 4/);
+  assert.match(getForageBlockReason(first)!, new RegExp(`day ${1 + RESOURCE_REGEN_DAYS}`));
   const repeat = forage(first);
   assert.equal(repeat.player.pollen, first.player.pollen);
   assert.equal(repeat.player.energy, first.player.energy);
-  const day2 = endDay(first, safe);
-  const day3 = endDay(day2, safe);
-  const day4 = endDay(day3, safe);
-  assert.equal(canForage(day2), false);
-  assert.equal(canForage(day3), false);
-  assert.equal(canForage(day4), true);
-  assert.equal(forage(day4).player.pollen, 24);
+  let renewed = first;
+  for (let day = 1; day <= RESOURCE_REGEN_DAYS; day++) {
+    renewed = endDay(renewed, safe);
+    assert.equal(canForage(renewed), day === RESOURCE_REGEN_DAYS);
+  }
+  assert.equal(forage(renewed).player.pollen, 24);
   assert.equal(first.map.get('0,0')!.lastForagedDay, 1);
 });
 
-test('foraging obeys energy and terrain restrictions in the engine, not just the interface', () => {
+test('foraging obeys terrain and safe feeding restrictions in the engine, not just the interface', () => {
   for (const type of [TerrainType.NEST, TerrainType.ROAD, TerrainType.WATER]) {
     const initial = scenario([tile(0, 0, type)]);
     assert.equal(canForage(initial), false);
+    assert.equal(getForagePreview(initial), null);
     assert.equal(forage(initial).player.pollen, 0);
   }
-  const tired = scenario([tile(0, 0)]);
-  tired.player.energy = 4;
-  assert.match(getForageBlockReason(tired)!, /exhausted/);
-  assert.equal(forage(tired).player.energy, 4);
+  const poorPatch = scenario([tile(0, 0, TerrainType.MEADOW, { resourceQuality: 1 })]);
+  poorPatch.player.energy = 1;
+  assert.match(getForageBlockReason(poorPatch)!, /cannot provide enough energy/);
+  assert.equal(forage(poorPatch).player.energy, 1);
+  assert.equal(forage(poorPatch).metrics.forageVisits, 0);
+});
+
+test('hungry pollinators can recover from flowers without an upfront energy requirement', () => {
+  for (const species of Object.values(SpeciesType)) {
+    const hungry = scenario([tile(0, 0)], species);
+    hungry.player.energy = 1;
+    const preview = getForagePreview(hungry)!;
+    assert.ok(hungry.player.energy < hungry.species!.energyCostForage);
+    assert.equal(canForage(hungry), true);
+    const fed = forage(hungry);
+    assert.equal(fed.status, 'PLAYING');
+    assert.equal(fed.player.energy, preview.energyAfter);
+    assert.ok(fed.player.energy > 1);
+    assert.equal(fed.metrics.energySpent, hungry.species!.energyCostForage);
+  }
+});
+
+test('forage previews report actual capped recovery and match feeding in every weather', () => {
+  for (const species of Object.values(SpeciesType)) {
+    for (const weather of Object.values(Weather)) {
+      for (const energy of [1, SPECIES_DATA[species].maxEnergy - 2, SPECIES_DATA[species].maxEnergy]) {
+        const initial = scenario([tile(0, 0, TerrainType.CROP)], species);
+        initial.weather = weather;
+        initial.player.energy = energy;
+        const preview = getForagePreview(initial)!;
+        const fed = forage(initial);
+        assert.equal(fed.player.energy, preview.energyAfter);
+        assert.equal(fed.player.energy - energy, preview.energyChange);
+        assert.equal(fed.player.pollen, preview.creditedResources);
+        assert.ok(preview.energyAfter <= SPECIES_DATA[species].maxEnergy);
+        if (energy === SPECIES_DATA[species].maxEnergy) assert.equal(preview.energyChange, 0);
+        if (energy === SPECIES_DATA[species].maxEnergy - 2) assert.equal(preview.energyChange, 2);
+        assert.match(fed.player.history.at(-1)!.event, /after feeding and foraging costs/);
+      }
+    }
+  }
+  assert.equal(getForagePreview(createInitialState()), null);
+});
+
+test('forage previews separate aphid credit from food and account for toxicity impairment', () => {
+  const plain = scenario([tile(0, 0, TerrainType.CROP)], SpeciesType.HOVERFLY);
+  plain.weather = Weather.CLOUDY;
+  plain.player.energy = 40;
+  plain.player.toxicity = 16;
+  const nearAphids = { ...plain, map: new Map([['0,0', tile(0, 0, TerrainType.CROP, { aphids: true })]]) };
+  const normal = getForagePreview(plain)!;
+  const bonus = getForagePreview(nearAphids)!;
+  assert.equal(normal.harvest, 5);
+  assert.equal(normal.foodEnergy, 20);
+  assert.equal(normal.energyAfter, 56);
+  assert.equal(bonus.harvest, normal.harvest);
+  assert.equal(bonus.foodEnergy, normal.foodEnergy);
+  assert.equal(bonus.energyAfter, normal.energyAfter);
+  assert.equal(bonus.creditedResources, 7);
+  assert.equal(forage(nearAphids).player.energy, bonus.energyAfter);
 });
 
 test('foraging and movement toxicity deaths clamp to species threshold', () => {
@@ -354,14 +411,14 @@ test('metrics reflect actual distance before death, cumulative exposure and acti
   const dead = move(state, 2, 0, () => 0);
   assert.equal(dead.metrics.distance, 1);
   assert.equal(dead.metrics.collisions, 1);
-  assert.equal(dead.metrics.energySpent, 45);
+  assert.equal(dead.metrics.energySpent, state.species!.energyCostMove + ROAD_COLLISION_ENERGY_LOSS);
   assert.equal(dead.metrics.completedDays, 0);
   let exposed = scenario([tile(0, 0, TerrainType.NEST), tile(1, 0, TerrainType.CROP, { pesticideLevel: 1 })]);
   exposed = forage(move(exposed, 1, 0, safe));
   assert.equal(exposed.metrics.forageVisits, 1);
   assert.equal(exposed.metrics.exposureEvents, 2);
   assert.equal(exposed.metrics.toxicityAccumulated, 12);
-  assert.equal(exposed.metrics.energySpent, 15);
+  assert.equal(exposed.metrics.energySpent, exposed.species!.energyCostMove + exposed.species!.energyCostForage);
 });
 
 test('same seed, pollinator and actions replay identically without global randomness', () => {
