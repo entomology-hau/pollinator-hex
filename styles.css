@@ -5,6 +5,8 @@
 @layer base {
   body { margin: 0; font-family: Inter, Arial, sans-serif; }
   :focus-visible { outline: 3px solid #fcd34d; outline-offset: 4px; }
+  /* Headings receive focus after a screen change for screen-reader navigation. */
+  h1[tabindex="-1"]:focus { outline: none; }
   button { touch-action: manipulation; }
   progress { border: 0; border-radius: 999px; }
 }

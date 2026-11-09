@@ -5,6 +5,7 @@ import { HEX_SIZE, RESOURCE_REGEN_DAYS, TERRAIN_CONFIG } from '../constants';
 import { getMovePreview } from '../game/rules';
 import { BeeIcon } from './BeeIcon';
 import { FlyIcon } from './FlyIcon';
+import { SolitaryBeeIcon } from './SolitaryBeeIcon';
 
 interface Props {
   gameState: GameState;
@@ -197,7 +198,7 @@ export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
                 <circle r="17" fill="#0f172a" />
                 <foreignObject x="-14" y="-14" width="28" height="28">
                   <div className="flex h-full w-full items-center justify-center text-white">
-                    {species?.name === SpeciesType.HOVERFLY ? <FlyIcon size={26} /> : <BeeIcon size={26} />}
+                    {species?.name === SpeciesType.HOVERFLY ? <FlyIcon size={26} /> : species?.name === SpeciesType.SOLITARY_BEE ? <SolitaryBeeIcon size={26} /> : <BeeIcon size={26} />}
                   </div>
                 </foreignObject>
               </>}

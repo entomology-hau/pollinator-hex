@@ -4,6 +4,7 @@ import { Battery, Zap, Target, Skull } from 'lucide-react';
 import { REPRESENTATIVE_SPECIES } from '../constants';
 import { BeeIcon } from './BeeIcon';
 import { FlyIcon } from './FlyIcon';
+import { SolitaryBeeIcon } from './SolitaryBeeIcon';
 
 interface Props {
   species: SpeciesStats;
@@ -20,8 +21,8 @@ export const SpeciesCard: React.FC<Props> = ({ species, onSelect }) => {
       
       <div className="flex items-center justify-between w-full mb-4">
         <h3 className="text-2xl font-bold text-slate-100 group-hover:text-amber-400">{species.name}</h3>
-        <div className="text-slate-400 group-hover:text-amber-400">
-             {species.name === SpeciesType.HOVERFLY ? <FlyIcon size={32} /> : <BeeIcon size={32} />}
+        <div className="shrink-0 ml-3">
+             {species.name === SpeciesType.HOVERFLY ? <FlyIcon size={64} /> : species.name === SpeciesType.SOLITARY_BEE ? <SolitaryBeeIcon size={64} /> : <BeeIcon size={64} />}
         </div>
       </div>
       
