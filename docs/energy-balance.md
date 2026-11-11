@@ -1,6 +1,6 @@
 # Energy balance checks
 
-Model 3.2 returned to the original activity-and-rest loop; model 3.4 retains that energy balance. The main objective is reproductive output. Energy limits how much collecting and travelling a pollinator can do before it needs to rest; survival alone is not a high score.
+Model 3.2 returned to the original activity-and-rest loop; model 3.5 retains its energy parameters. The main objective is reproductive output. Energy limits how much collecting and travelling a pollinator can do before it needs to rest; survival alone is not a high score.
 
 ## Balance changes
 
@@ -38,7 +38,7 @@ A cautious routine visits the two visible, pesticide-free flowers beside the nes
 
 A pollinator that rests at the nest for the entire season survives but collects no resources and gains no reproductive output. Survival without collecting is therefore not equivalent to success.
 
-## Reproduction and reproducibility
+## Reproductive scaling: model 3.4 reference runs
 
 Model 3.3 calibrated bee reproductive allocation; model 3.4 increases both bee pollen allocations by 20%. Each underlying resource unit now represents 18 mg pollen-equivalent for bumblebee colony support or 1.5 mg for solitary-bee nest provisioning. The underlying harvest and all energy, movement, cooldown and hazard rules retain their model 3.2 values. The offspring requirements remain 60 mg per worker and 65 mg per nest cell. Hoverfly output and the aphid bonus are unchanged.
 
@@ -52,6 +52,12 @@ The calibration uses the strongest productive seasons found in a search of 72 st
 
 The bumblebee and hoverfly examples use `hau-ecology-01`; the solitary-bee example uses `output-estimate-6`. All use the reduced-pesticide treatment and complete 15 days. Replaying these and the default-seed flower-strip controls in model 3.4 preserves every daily energy, collection and toxicity trace. The controls now produce 234 workers, 30 nest cells and 448 eggs. These outputs are not hard caps; a different route or landscape can produce more. The allocation factors compress reproductive resource support and do not describe a measured pollen load per flight.
 
-Keep model 3.4 results separate from earlier versions when comparing class outputs. New screen totals and exports use the scaled reproductive quantities; saved older results are left unchanged.
+These are model 3.4 benchmarks. Model 3.5 changes floral availability, so their output values and exact routes are not predictions for the new landscapes. Screen totals and exports retain the same species-specific reproductive scaling; saved older results are left unchanged.
+
+## Variable floral resources in model 3.5
+
+All generated meadow, crop, woodland and garden tiles start with a positive supply. The previously empty scenario patches now have seeded background abundance of 35–54. Flower-strip treatments add 40 to the same corridor patches. The aphid comparison adds equal enhancements to matched near or far patches, preserving both total floral supply and the distribution of unbonused harvest amounts. Aphid crop tiles contain flowers in both conditions; the adult floral harvest remains distinct from the automatic reproductive habitat bonus.
+
+Roads, water and the nest remain resource-free. A used patch still needs three days to replenish, so the new supply cannot be repeatedly collected without advancing the season. Flight, food energy, rest, exposure and reproductive conversion parameters are unchanged. Keep model 3.5 results separate from earlier versions in exported comparisons.
 
 Run `node --import tsx --test tests/energy-balance.test.ts`. The six tests cover the bounded collecting route and cautious versus inactive seasons. Existing rules tests separately cover rest capacity limits, exposed-night risks, crop feeding, flower recovery, depletion, exhaustion, hazards and reproductive conversions.

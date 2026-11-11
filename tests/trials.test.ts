@@ -88,7 +88,7 @@ test('scaled resource quantities and fractional pollen-equivalents survive savin
   }
 });
 
-test('model 3.2 and 3.3 snapshots retain their quantities and remain separate from model 3.4', () => {
+test('earlier model snapshots retain their quantities and remain separate from the current model', () => {
   const old = result({ id: 'before-scaling', modelVersion: '3.2', resourcesCollected: 124, score: 2 });
   const previous = result({
     id: 'previous-scaling', modelVersion: '3.3', resourcesCollected: 1860, score: 31,

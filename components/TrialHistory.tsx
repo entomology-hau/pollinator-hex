@@ -23,8 +23,8 @@ export const TrialHistory: React.FC<Props> = ({ results, onReplay, onExportSumma
         <h2 id="trial-history-heading" className="text-xl font-bold text-amber-200">Saved results</h2>
         <p className="text-sm text-slate-300">{results.length} saved {results.length === 1 ? 'run' : 'runs'} · latest 100 kept</p>
       </div>
-      <p className="text-sm text-slate-300">For your class graph, record the pollinator, condition and reproductive output. These results are saved only in this browser.</p>
-      {results.length === 0 ? <p className="mt-4 text-sm text-slate-200">Finish a simulation to save your first result. Include zero outcomes in your class graph.</p> : <>
+      <p className="text-sm text-slate-300">These results are saved only in this browser. Export them as CSV for later analysis.</p>
+      {results.length === 0 ? <p className="mt-4 text-sm text-slate-200">Finish a simulation to save your first result. Runs with zero reproductive output are saved too.</p> : <>
         <div className="flex flex-wrap gap-3 my-4">
           <button type="button" onClick={onExportSummary} className="rounded-lg bg-amber-400 px-4 py-3 text-sm font-bold text-slate-950 hover:bg-amber-300">Export all {results.length} summaries (CSV)</button>
           <button type="button" onClick={onExportEvents} className="rounded-lg border border-slate-500 px-4 py-3 text-sm hover:bg-slate-800">Export all action histories (CSV)</button>

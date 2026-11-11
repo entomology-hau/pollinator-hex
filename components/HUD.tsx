@@ -1,6 +1,6 @@
 import React from 'react';
 import { GameState, HexCell, TerrainType, SpeciesType } from '../types';
-import { MAX_DAYS, WEATHER_EFFECTS, TERRAIN_CONFIG, HOVERFLY_APHID_BONUS_MULTIPLIER } from '../constants';
+import { MAX_DAYS, WEATHER_EFFECTS, TERRAIN_CONFIG, HOVERFLY_APHID_BONUS_MULTIPLIER, RESOURCE_REGEN_DAYS } from '../constants';
 import { getReproductiveScore, getResourceQuantity, hasNearbyAphids, isSafeShelter } from '../game/rules';
 import { Battery, CloudRain, Sun, Cloud, Flower, Skull, HelpCircle, LogOut } from 'lucide-react';
 import { formatEventForDisplay } from './formatEvent';
@@ -17,8 +17,9 @@ export const HUD: React.FC<Props> = ({ gameState, currentHex, onOpenHelp, onExit
   const { player, weather, day, species } = gameState;
   const WeatherIcon = { SUNNY: Sun, RAINY: CloudRain, CLOUDY: Cloud }[weather];
   const terrain = TERRAIN_CONFIG[currentHex.type];
-  const terrainLabel = currentHex.flowerStrip ? 'Flower strip' : currentHex.type === TerrainType.MEADOW && currentHex.resourceQuality === 0 ? 'Unflowering meadow' : terrain.label;
+  const terrainLabel = currentHex.flowerStrip ? 'Flower strip' : terrain.label;
   const hasFlowers = currentHex.resourceQuality > 0 && ![TerrainType.NEST, TerrainType.WATER, TerrainType.ROAD].includes(currentHex.type);
+  const depleted = currentHex.lastForagedDay !== null && day - currentHex.lastForagedDay < RESOURCE_REGEN_DAYS;
   const isHoverfly = species.name === SpeciesType.HOVERFLY;
   const aphidBonus = isHoverfly && hasFlowers && hasNearbyAphids(gameState);
   const sheltered = isSafeShelter(gameState);
@@ -54,8 +55,8 @@ export const HUD: React.FC<Props> = ({ gameState, currentHex, onOpenHelp, onExit
         <h2 id="current-tile-title" className="font-bold mb-3">{terrainLabel}</h2>
         <dl className="text-sm space-y-2">
           <div className="flex justify-between gap-3"><dt className="text-slate-300">Hazards</dt><dd className="text-right">{riskLabel}</dd></div>
-          <div className="flex justify-between gap-3"><dt className="text-slate-300">Flowers</dt><dd className="text-right">{hasFlowers ? 'Present' : 'None'}</dd></div>
-          {hasFlowers && <div className="flex justify-between gap-3"><dt className="text-slate-300">Resource quality</dt><dd>{currentHex.resourceQuality}%</dd></div>}
+          <div className="flex justify-between gap-3"><dt className="text-slate-300">Flowers</dt><dd className="text-right">{hasFlowers ? depleted ? `Replenish on day ${currentHex.lastForagedDay! + RESOURCE_REGEN_DAYS}` : 'Available' : 'None'}</dd></div>
+          {hasFlowers && <div className="flex justify-between gap-3"><dt className="text-slate-300">Full-patch abundance</dt><dd>{currentHex.resourceQuality}%</dd></div>}
           {currentHex.pesticideLevel > 0 && <div className="flex justify-between gap-3"><dt className="text-slate-300">Exposure level</dt><dd>{(currentHex.pesticideLevel * 100).toFixed(0)}%</dd></div>}
           <div className="flex justify-between gap-3"><dt className="text-slate-300">Aphid patch</dt><dd>{currentHex.aphids ? 'Present' : 'Absent'}</dd></div>
           <div className="flex justify-between gap-3"><dt className="text-slate-300">Night shelter</dt><dd>{sheltered ? 'Safe for this pollinator' : 'Exposed'}</dd></div>

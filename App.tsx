@@ -109,7 +109,6 @@ export default function App() {
             <p className="text-sm text-slate-300 mt-3">{isHoverfly ? `${resources} resource units gathered, including habitat bonuses; ${HOVERFLY_RESOURCES_PER_EGG} units support one potential egg.` : `${resources} mg pollen-equivalent gathered; ${species.name === SpeciesType.BUMBLEBEE ? BUMBLEBEE_POLLEN_PER_WORKER_MG : SOLITARY_POLLEN_PER_CELL_MG} mg per ${species.name === SpeciesType.BUMBLEBEE ? 'worker supported' : 'nest cell'}.`}</p>
             <p className="text-xs text-slate-300 mt-2">Resources translate automatically into fictional reproductive output. Development and offspring survival are not simulated.</p>
           </section>
-          <p className="rounded-lg bg-amber-950/30 p-3 text-amber-100 mb-5">For the class graph: {species.name} · {gameState.config.treatment === 'control' ? 'Control' : 'Treatment'} · <strong>{output.score} {output.label.toLowerCase()}</strong></p>
           <dl className="grid grid-cols-3 gap-3 mb-5 text-sm">
             {[
               [isHoverfly ? 'Resources (units)' : 'Pollen-equivalent (mg)', resources], ['Days completed', gameState.metrics.completedDays], ['Distance (hexes)', gameState.metrics.distance],

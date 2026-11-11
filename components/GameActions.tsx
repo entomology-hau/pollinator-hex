@@ -1,6 +1,6 @@
 import React from 'react';
 import { Battery, Flower, Moon } from 'lucide-react';
-import { GameState, HexCell, SpeciesType, TerrainType } from '../types';
+import { GameState, HexCell, SpeciesType } from '../types';
 import { MAX_DAYS, TERRAIN_CONFIG } from '../constants';
 import { getForageBlockReason, getForagePreview, getResourceQuantity, getRestPreview } from '../game/rules';
 
@@ -21,9 +21,7 @@ export const GameActions: React.FC<Props> = ({ gameState, currentHex, onForage, 
   const forage = getForagePreview(gameState);
   const rest = getRestPreview(gameState);
   if (!rest) return null;
-  const terrainLabel = currentHex.flowerStrip ? 'Flower strip'
-    : currentHex.type === TerrainType.MEADOW && currentHex.resourceQuality === 0 ? 'Unflowering meadow'
-      : TERRAIN_CONFIG[currentHex.type].label;
+  const terrainLabel = currentHex.flowerStrip ? 'Flower strip' : TERRAIN_CONFIG[currentHex.type].label;
   const energyNote = forage && (forage.energyChange > 0
     ? `Recover ${formatEnergy(forage.energyChange)} energy.`
     : forage.energyChange < 0

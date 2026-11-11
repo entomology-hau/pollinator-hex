@@ -22,8 +22,8 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDescription> = {
     id: 'flower-strips', title: 'Flower strips and foraging',
     question: 'Do extra flowers along a corridor increase resources gathered and reproductive output?',
     predictionPrompt: 'Predict how adding flowers will change resources gathered and reproductive output.',
-    controlLabel: 'No corridor flowers', interventionLabel: 'Flowering corridor',
-    description: 'A fixed meadow corridor leads west from the nest to an outer flower patch. The intervention adds flowers along this corridor; the landscape, roads and exposure remain unchanged.',
+    controlLabel: 'Baseline corridor flowers', interventionLabel: 'Enhanced corridor flowers',
+    description: 'A fixed meadow corridor leads west from the nest to an outer flower patch. Each meadow has flowers, with some patches richer than others. The treatment increases the flowers along this corridor; the landscape, roads and exposure remain unchanged.',
     changedFactor: 'Floral supply along five fixed corridor cells; habitat and hazards are held constant.'
   },
   pesticide: {
@@ -38,9 +38,9 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDescription> = {
     id: 'hoverfly', title: 'Flowers near aphid patches',
     question: 'Do flowers near aphid patches increase hoverfly reproductive output?',
     predictionPrompt: 'Predict how nearby larval food will change the reproductive benefit of floral feeding.',
-    controlLabel: 'Flowers farther from aphids', interventionLabel: 'Flowers near aphids',
-    description: 'Four equal floral patches are placed either far from or close to two fixed aphid patches. Total floral supply, habitat types, pesticide levels and roads are identical between conditions.',
-    changedFactor: 'The position of four floral patches; their total resource quality is conserved.'
+    controlLabel: 'Extra flowers farther from aphids', interventionLabel: 'Extra flowers near aphids',
+    description: 'Extra flowers are added to four patches either far from or close to two fixed aphid patches. Every meadow and crop patch has flowers. Both conditions offer the same total flower resources; habitat types, pesticide levels and roads are unchanged.',
+    changedFactor: 'The location of extra flowers; total floral supply is held constant.'
   }
 };
 
@@ -62,6 +62,10 @@ const distanceFromNest = (q: number, r: number) => (Math.abs(q) + Math.abs(r) + 
 const coordinateKey = (q: number, r: number) => `${q},${r}`;
 const hasFloralHabitat = (type: TerrainType) =>
   [TerrainType.MEADOW, TerrainType.FOREST, TerrainType.CROP, TerrainType.URBAN].includes(type);
+// Even the lowest baseline yields food for an impaired hoverfly in rain.
+const backgroundFloralQuality = (seed: string, key: string) =>
+  35 + Math.floor(randomUnit(seed, 'map', `${key}:floral-background`) * 20);
+const FLORAL_ENHANCEMENT = 40;
 
 const baselineMap = (seed: string): Map<string, HexCell> => {
   const map = new Map<string, HexCell>();
@@ -122,13 +126,14 @@ export const createScenario = (input: Partial<RunConfig> = {}): { map: Map<strin
   // A known nearby crop supports an early comparison without searching the whole map.
   setCell(map, -1, 1, { type: TerrainType.CROP, resourceQuality: 80, pesticideLevel: 0.6, aphids: config.scenarioId !== 'hoverfly' });
   for (const [q, r] of APHID_PATCHES) {
-    setCell(map, q, r, { type: TerrainType.CROP, resourceQuality: 0, pesticideLevel: 0.25, aphids: true });
+    setCell(map, q, r, { type: TerrainType.CROP, resourceQuality: backgroundFloralQuality(config.seed, coordinateKey(q, r)), pesticideLevel: 0.25, aphids: true });
   }
 
   if (config.scenarioId === 'flower-strips') {
     for (const [q, r] of FLOWER_CORRIDOR) {
       setCell(map, q, r, {
-        type: TerrainType.MEADOW, resourceQuality: config.treatment === 'intervention' ? 75 : 0,
+        type: TerrainType.MEADOW,
+        resourceQuality: backgroundFloralQuality(config.seed, coordinateKey(q, r)) + (config.treatment === 'intervention' ? FLORAL_ENHANCEMENT : 0),
         pesticideLevel: 0, aphids: false, flowerStrip: config.treatment === 'intervention'
       });
     }
@@ -139,11 +144,15 @@ export const createScenario = (input: Partial<RunConfig> = {}): { map: Map<strin
     // Only the two designated aphid patches are used in this spatial experiment.
     for (const [key, cell] of map) map.set(key, { ...cell, aphids: false });
     for (const [q, r] of APHID_PATCHES) setCell(map, q, r, { aphids: true });
-    for (const [q, r] of [...NEAR_APHID_FLOWERS, ...FAR_APHID_FLOWERS]) {
-      setCell(map, q, r, { type: TerrainType.MEADOW, resourceQuality: 0, pesticideLevel: 0, aphids: false, flowerStrip: false });
+    // Matching each near/far pair preserves rounded harvests as well as total quality.
+    for (const [index, near] of NEAR_APHID_FLOWERS.entries()) {
+      const resourceQuality = backgroundFloralQuality(config.seed, `hoverfly-pair:${index}`);
+      for (const [q, r] of [near, FAR_APHID_FLOWERS[index]]) {
+        setCell(map, q, r, { type: TerrainType.MEADOW, resourceQuality, pesticideLevel: 0, aphids: false, flowerStrip: false });
+      }
     }
     const active = config.treatment === 'intervention' ? NEAR_APHID_FLOWERS : FAR_APHID_FLOWERS;
-    for (const [q, r] of active) setCell(map, q, r, { resourceQuality: 75, flowerStrip: true });
+    for (const [q, r] of active) setCell(map, q, r, { resourceQuality: map.get(coordinateKey(q, r))!.resourceQuality + FLORAL_ENHANCEMENT, flowerStrip: true });
   }
 
   if (config.scenarioId === 'pesticide' && config.treatment === 'intervention') {

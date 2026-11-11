@@ -4,7 +4,7 @@ export const HEX_SIZE = 30;
 export const MAP_RADIUS = 6;
 export const MAX_DAYS = 15;
 export const START_ENERGY = 100;
-export const MODEL_VERSION = '3.4';
+export const MODEL_VERSION = '3.5';
 // Energy is a simple activity budget: feeding helps a little; rest restores stamina.
 export const ENERGY_PER_RESOURCE = 0.5;
 export const CROP_ENERGY_BONUS = 5;
