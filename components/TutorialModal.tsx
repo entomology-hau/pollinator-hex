@@ -73,7 +73,7 @@ export const TutorialModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </p>
             <ol className="list-decimal space-y-2 pl-5">
               <li><strong>Move:</strong> select a reachable hex. Check the flight cost and known hazards.</li>
-              <li><strong>Forage:</strong> collect resources for reproduction. Used flowers replenish after {RESOURCE_REGEN_DAYS} days.</li>
+              <li><strong>Forage:</strong> collect resources for reproduction. Meadows, flowering crops, woodland and urban gardens offer varying flower resources; used patches replenish after {RESOURCE_REGEN_DAYS} days.</li>
               <li><strong>Rest:</strong> recover some energy and advance to tomorrow. Leave enough energy to reach shelter.</li>
             </ol>
           </section>
@@ -134,7 +134,7 @@ export const TutorialModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </p>
             <p>
               Each road hex crossed has a 25% collision chance, costing 35 energy. The movement preview
-              excludes possible collision damage. Water and roads supply no food; water does not remove toxicity.
+              excludes possible collision damage. The nest, water and roads supply no food; water does not remove toxicity.
             </p>
             <p className="flex items-start gap-2 text-blue-100">
               <Sun className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -145,13 +145,12 @@ export const TutorialModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
           <section className="space-y-3">
             <h3 className="flex items-center gap-2 text-lg font-bold text-white">
-              <Target className="h-5 w-5 text-emerald-300" aria-hidden="true" /> Your class comparison
+              <Target className="h-5 w-5 text-emerald-300" aria-hidden="true" /> Compare your results
             </h3>
             <p>
               Predict how the treatment will change reproductive output. Compare <strong>Control</strong> with
               <strong> Treatment</strong>, using the same scenario, pollinator
-              and agreed settings. Report your pollinator, condition and final reproductive output on the class graph.
-              Keep species and scenarios separate.
+              and agreed settings. Keep species and scenarios separate.
             </p>
             <p>
               The same seed holds the background landscape and weather constant. Use comparable strategies across
@@ -159,8 +158,8 @@ export const TutorialModal: React.FC<Props> = ({ isOpen, onClose }) => {
               practice but is not an independent environmental replicate.
             </p>
             <p>
-              Finished runs are saved in this browser, up to 100 results. CSV exports include settings and outcomes
-              or the action history. Compare results from the same model version.
+              Finished runs are saved in this browser, up to 100 results. Export settings and outcomes
+              or the action history as CSV for later analysis. Compare results from the same model version.
             </p>
           </section>
 

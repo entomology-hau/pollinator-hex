@@ -35,7 +35,7 @@ const KEY_DIRECTIONS: Record<string, [number, number]> = {
 const keyOf = (q: number, r: number) => `${q},${r}`;
 const formatEnergy = (value: number) => Number(value.toFixed(1)).toString();
 const hasFlowers = (cell: HexCell) => cell.resourceQuality > 0 && ![TerrainType.NEST, TerrainType.WATER, TerrainType.ROAD].includes(cell.type);
-const terrainLabel = (cell: HexCell) => cell.flowerStrip ? 'Flower strip' : cell.type === TerrainType.MEADOW && cell.resourceQuality === 0 ? 'Unflowering meadow' : TERRAIN_CONFIG[cell.type].label;
+const terrainLabel = (cell: HexCell) => cell.flowerStrip ? 'Flower strip' : TERRAIN_CONFIG[cell.type].label;
 
 export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
   const { map, player, species, day } = gameState;
@@ -63,6 +63,7 @@ export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
 
   const cells = Array.from(map.values());
   const selectedCell = map.get(previewKey) ?? map.get(playerKey);
+  const selectedDepleted = selectedCell?.lastForagedDay != null && day - selectedCell.lastForagedDay < RESOURCE_REGEN_DAYS;
   const selectedPreview = selectedCell ? getMovePreview(gameState, selectedCell.q, selectedCell.r) : null;
   // Do not reveal terrain on a route that the player has not explored.
   const visibleRoads = selectedPreview?.path.filter(({ q, r }) => {
@@ -254,7 +255,7 @@ export const HexGrid: React.FC<Props> = ({ gameState, onHexClick }) => {
           <p className="font-semibold text-slate-100">
             {selectedCell.isRevealed ? terrainLabel(selectedCell) : 'Unexplored terrain'}
           </p>
-          {selectedCell.isRevealed && <p className="mt-1 text-xs text-slate-300">{hasFlowers(selectedCell) ? `Flower quality: ${selectedCell.resourceQuality}%.` : 'No floral resources.'}{selectedCell.aphids ? ' Aphid habitat: nearby flowers give hoverflies a resource bonus.' : ''}{selectedCell.pesticideLevel > 0 ? ` Exposure level: ${(selectedCell.pesticideLevel * 100).toFixed(0)}%.` : ' No pesticide exposure.'}</p>}
+          {selectedCell.isRevealed && <p className="mt-1 text-xs text-slate-300">{hasFlowers(selectedCell) ? `Full-patch abundance: ${selectedCell.resourceQuality}%.${selectedDepleted ? ` Flowers replenish on day ${selectedCell.lastForagedDay! + RESOURCE_REGEN_DAYS}.` : ''}` : 'No floral resources.'}{selectedCell.aphids ? ' Aphid habitat: nearby flowers give hoverflies a resource bonus.' : ''}{selectedCell.pesticideLevel > 0 ? ` Exposure level: ${(selectedCell.pesticideLevel * 100).toFixed(0)}%.` : ' No pesticide exposure.'}</p>}
           {keyOf(selectedCell.q, selectedCell.r) === playerKey ? (
             <p className="mt-1 text-slate-300">Your current location. Inspect another hex to preview a flight.</p>
           ) : <>
